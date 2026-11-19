@@ -1,0 +1,24 @@
+# AETHER X Backend Dependencies
+# Official Google Gen AI SDK (Current Interactions & Multimodal support)
+google-genai>=2.25.0
+
+# FastAPI & Server
+fastapi>=0.115.0
+uvicorn[standard]>=0.30.0
+pydantic>=2.8.0
+pydantic-settings>=2.4.0
+python-multipart>=0.0.9
+
+# AI Orchestration
+langchain>=0.2.0
+langgraph>=0.2.0
+langchain-core>=0.2.0
+
+# HTTP & Multimodal Utilities
+requests>=2.31.0
+pillow>=10.0.0
+httpx>=0.27.0
+
+# Testing
+pytest>=8.0.0
+pytest-asyncio>=0.23.0

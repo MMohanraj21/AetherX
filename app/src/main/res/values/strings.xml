@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">AETHER X</string>
+    <string name="accessibility_service_description">AETHER X Grounded UI Automation Service. Empowers the AI assistant to perform authorized user actions with mandatory safety confirmations.</string>
+</resources>
