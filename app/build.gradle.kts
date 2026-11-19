@@ -1,23 +1,25 @@
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
-    id("org.jetbrains.kotlin.plugin.compose")
+    id("kotlin-kapt")
 }
 
 android {
-    namespace = "com.aetherx.assistant"
+    namespace = "com.jarvis.assistant"
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "com.aetherx.assistant"
+        applicationId = "com.zara.assistant"
         minSdk = 26
         targetSdk = 34
-        versionCode = 100
+        versionCode = 200
         versionName = "2.0.0"
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-        buildConfigField("String", "APP_NAME", "\"AETHER X\"")
-        buildConfigField("String", "BRAND_TAGLINE", "\"Next-Gen Cyberpunk Multimodal AI Assistant\"")
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        buildConfigField("String", "DEVELOPER_NAME", "\"Mohanraj\"")
+        buildConfigField("String", "COPYRIGHT_OWNER", "\"Mohanraj\"")
+        buildConfigField("String", "PINNED_RELEASE_CERT_SHA256", "\"ECB3E2D3C1FDFEC3C610D7A6EC28DB39CDC87CC4198E6E1307D4AC9470FF3301\"")
+        buildConfigField("String", "VERIFICATION_ENDPOINT", "\"\"")
     }
 
     signingConfigs {
@@ -26,17 +28,21 @@ android {
             storePassword = "aetherx_secret"
             keyAlias = "aetherx"
             keyPassword = "aetherx_secret"
+            enableV1Signing = true
+            enableV2Signing = true
+            enableV3Signing = true
         }
     }
 
     buildTypes {
         release {
             isMinifyEnabled = false
-            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            isShrinkResources = false
             signingConfig = signingConfigs.getByName("release")
         }
         debug {
             applicationIdSuffix = ".debug"
+            signingConfig = signingConfigs.getByName("release")
         }
     }
 
@@ -50,40 +56,39 @@ android {
     }
 
     buildFeatures {
-        compose = true
+        viewBinding = true
         buildConfig = true
+    }
+
+    lint {
+        disable += "NullSafeMutableLiveData"
     }
 }
 
 dependencies {
-    implementation(project(":networking"))
-    implementation(project(":security"))
-    implementation(project(":memory-engine"))
-    implementation(project(":voice-engine"))
-    implementation(project(":vision-engine"))
-    implementation(project(":automation-engine"))
-    implementation(project(":ai-engine"))
-
     implementation("androidx.core:core-ktx:1.13.1")
-    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.2")
-    implementation("androidx.activity:activity-compose:1.9.0")
-
-    // Jetpack Compose BOM
-    implementation(platform("androidx.compose:compose-bom:2024.06.00"))
-    implementation("androidx.compose.ui:ui")
-    implementation("androidx.compose.ui:ui-graphics")
-    implementation("androidx.compose.ui:ui-tooling-preview")
-    implementation("androidx.compose.material3:material3")
-    implementation("androidx.compose.material:material-icons-extended")
-
+    implementation("androidx.appcompat:appcompat:1.7.0")
+    implementation("com.google.android.material:material:1.12.0")
+    implementation("androidx.constraintlayout:constraintlayout:2.1.4")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.8.6")
+    implementation("androidx.lifecycle:lifecycle-livedata-ktx:2.8.6")
+    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.6")
+    implementation("androidx.activity:activity-ktx:1.9.3")
+    implementation("androidx.recyclerview:recyclerview:1.3.2")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
-    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.2")
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation("com.google.code.gson:gson:2.10.1")
+    implementation("androidx.webkit:webkit:1.12.0")
+    implementation("net.java.dev.jna:jna:5.13.0@aar")
+    implementation("com.alphacephei:vosk-android:0.3.75@aar")
 
-    // CameraX
-    implementation("androidx.camera:camera-core:1.3.4")
-    implementation("androidx.camera:camera-camera2:1.3.4")
-    implementation("androidx.camera:camera-lifecycle:1.3.4")
-    implementation("androidx.camera:camera-view:1.3.4")
+    // Room Database
+    implementation("androidx.room:room-runtime:2.6.1")
+    implementation("androidx.room:room-ktx:2.6.1")
+    kapt("androidx.room:room-compiler:2.6.1")
+
+    // Security Crypto for EncryptedSharedPreferences
+    implementation("androidx.security:security-crypto:1.1.0-alpha06")
 
     testImplementation("junit:junit:4.13.2")
 }

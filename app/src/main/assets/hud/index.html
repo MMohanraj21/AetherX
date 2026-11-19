@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
-<title>JARVIS — Mark 85 Arc Core</title>
+<title>ZARA — Mark 85 Arc Core</title>
 <style>
   :root {
     --bg-void: #050102;
@@ -522,7 +522,7 @@
     <div class="brand-area" id="core-mark-btn" title="View Chat History">
       <div class="reactor-mini-glyph"></div>
       <div class="brand-text-col">
-        <span class="brand-title">JARVIS</span>
+        <span class="brand-title">ZARA</span>
         <span class="brand-sub">MARK 85</span>
       </div>
     </div>
@@ -689,7 +689,7 @@
         break;
       case 'speaking':
         statusText.textContent = "TRANSMITTING";
-        orbCaption.textContent = "JARVIS TRANSMITTING AUDIO";
+        orbCaption.textContent = "ZARA TRANSMITTING AUDIO";
         orbCaption.style.color = "#ff5252";
         setSpeechPulse(audioLevel || 0.4);
         break;
@@ -813,47 +813,47 @@
 
   // Interactive Click Handlers (Connecting to Native Android Bridge)
   reactorAssembly.addEventListener('click', function() {
-    if (window.JarvisBridge && window.JarvisBridge.onOrbClicked) {
-      window.JarvisBridge.onOrbClicked();
+    if (window.ZaraBridge && window.ZaraBridge.onOrbClicked) {
+      window.ZaraBridge.onOrbClicked();
     }
   });
 
   btnMic.addEventListener('click', function() {
-    if (window.JarvisBridge && window.JarvisBridge.onMicClicked) {
-      window.JarvisBridge.onMicClicked();
+    if (window.ZaraBridge && window.ZaraBridge.onMicClicked) {
+      window.ZaraBridge.onMicClicked();
     }
   });
 
   btnPower.addEventListener('click', function() {
-    if (window.JarvisBridge && window.JarvisBridge.onPowerClicked) {
-      window.JarvisBridge.onPowerClicked();
+    if (window.ZaraBridge && window.ZaraBridge.onPowerClicked) {
+      window.ZaraBridge.onPowerClicked();
     }
   });
 
   btnVision.addEventListener('click', function() {
-    if (window.JarvisBridge && window.JarvisBridge.onScreenShareClicked) {
-      window.JarvisBridge.onScreenShareClicked();
+    if (window.ZaraBridge && window.ZaraBridge.onScreenShareClicked) {
+      window.ZaraBridge.onScreenShareClicked();
     }
   });
 
   btnHistory.addEventListener('click', function() {
-    if (window.JarvisBridge && window.JarvisBridge.onHistoryClicked) {
-      window.JarvisBridge.onHistoryClicked();
+    if (window.ZaraBridge && window.ZaraBridge.onHistoryClicked) {
+      window.ZaraBridge.onHistoryClicked();
     }
   });
 
   const coreMark = document.getElementById('core-mark-btn');
   if (coreMark) {
     coreMark.addEventListener('click', function() {
-      if (window.JarvisBridge && window.JarvisBridge.onHistoryClicked) {
-        window.JarvisBridge.onHistoryClicked();
+      if (window.ZaraBridge && window.ZaraBridge.onHistoryClicked) {
+        window.ZaraBridge.onHistoryClicked();
       }
     });
   }
 
   function openSettings() {
-    if (window.JarvisBridge && window.JarvisBridge.onSettingsClicked) {
-      window.JarvisBridge.onSettingsClicked();
+    if (window.ZaraBridge && window.ZaraBridge.onSettingsClicked) {
+      window.ZaraBridge.onSettingsClicked();
     }
   }
 

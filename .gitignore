@@ -24,3 +24,5 @@ local.properties
 .vscode/
 *.swp
 .DS_Store
+*.idsig
+keystore/uber-apk-signer.jar

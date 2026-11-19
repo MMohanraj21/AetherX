@@ -1,9 +1,7 @@
-name: Build & Release AETHER X APKs
+name: Build & Release Zara Assistant APK
 
 on:
   push:
-    branches: [ "main" ]
-  pull_request:
     branches: [ "main" ]
   workflow_dispatch:
 
@@ -12,7 +10,7 @@ permissions:
 
 jobs:
   build:
-    name: Compile & Package AETHER X APK
+    name: Compile & Package Zara APK
     runs-on: ubuntu-latest
 
     steps:
@@ -29,47 +27,45 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
-      - name: Verify Python Backend Tests (CI Environment)
-        env:
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY || 'AIzaSyDemoKeyMockForCIValidationOnly' }}
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY || 'sk-demoMockKeyForCIValidationOnly' }}
+      - name: Build Debug & Release APKs
         run: |
-          python3 -m pip install -r backend/requirements.txt || true
-          python3 -c "import sys; sys.path.insert(0, 'backend'); print('Backend imports verified')"
+          ./gradlew assembleDebug --stacktrace
+          ./gradlew assembleRelease --stacktrace
 
-      - name: Build Debug APK
-        run: ./gradlew assembleDebug --stacktrace
+      - name: Rename APK Artifacts
+        run: |
+          mkdir -p artifacts
+          cp app/build/outputs/apk/release/*.apk artifacts/Zara-release.apk
+          cp app/build/outputs/apk/debug/*.apk artifacts/Zara-debug.apk
 
-      - name: Build Release APK
-        run: ./gradlew assembleRelease --stacktrace
-
-      - name: Upload Debug APK Artifact
+      - name: Upload Zara Release Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: AetherX-debug
-          path: app/build/outputs/apk/debug/*.apk
+          name: Zara-release
+          path: artifacts/Zara-release.apk
 
-      - name: Upload Release APK Artifact
+      - name: Upload Zara Debug Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: AetherX-release
-          path: app/build/outputs/apk/release/*.apk
+          name: Zara-debug
+          path: artifacts/Zara-debug.apk
 
-      - name: Create GitHub Release (Main Branch)
-        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+      - name: Create GitHub Release (Zara Assistant)
+        if: github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v2.0.0
-          name: "AETHER X v2.0.0 — Production Release"
+          tag_name: v2.1.0
+          name: "Zara AI Assistant — Official Release"
           body: |
-            ### AETHER X — Next-Gen Android AI Assistant
-            - **Hybrid AI Core**: Google Gemini Live Bidirectional WebSocket (PCM 16k in / 24k out) + OpenAI fallback.
-            - **Multimodal Intelligence**: Fashion analysis, travel landmark recognition, document OCR.
-            - **Human-in-the-Loop Security**: `ActionGatekeeper` prevents unconfirmed calls or messages.
-            - **Keystore Encryption**: AES-256-GCM hardware protection for API credentials.
-            - **Cyberpunk UI**: Jetpack Compose holographic HUD with reactive quantum orb.
+            ### Zara AI Assistant
+            Developed by Mohanraj.
+            - Full Three.js 3D Quantum Arc Reactor HUD
+            - Bidirectional Gemini Live WebSocket Voice Streaming
+            - Offline Vosk Voice Recognition Core
+            - WhatsApp & YouTube Accessibility Automation
+            - Long-term Room Database Memory
           files: |
-            app/build/outputs/apk/release/*.apk
-            app/build/outputs/apk/debug/*.apk
+            artifacts/Zara-release.apk
+            artifacts/Zara-debug.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

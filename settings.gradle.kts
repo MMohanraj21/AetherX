@@ -11,23 +11,13 @@ pluginManagement {
         gradlePluginPortal()
     }
 }
-
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories {
         google()
         mavenCentral()
-        maven { url = java.net.URI("https://jitpack.io") }
     }
 }
 
-rootProject.name = "AetherX"
-
+rootProject.name = "Zara"
 include(":app")
-include(":ai-engine")
-include(":voice-engine")
-include(":vision-engine")
-include(":automation-engine")
-include(":memory-engine")
-include(":networking")
-include(":security")
