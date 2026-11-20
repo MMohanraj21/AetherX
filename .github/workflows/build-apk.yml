@@ -65,8 +65,8 @@ jobs:
 
       - name: Build Debug & Release APKs
         run: |
-          ./gradlew assembleDebug --stacktrace
-          ./gradlew assembleRelease --stacktrace
+          ./gradlew assembleDebug --stacktrace --no-daemon
+          ./gradlew assembleRelease --stacktrace --no-daemon
 
       - name: Rename APK Artifacts
         run: |
