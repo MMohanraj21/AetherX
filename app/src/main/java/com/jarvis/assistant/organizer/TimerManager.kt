@@ -17,10 +17,10 @@ object TimerManager {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
             context.startActivity(intent)
-            Log.i(TAG, "Timer started for \${lengthSeconds}s '\$message'")
+            Log.i(TAG, "Timer started for ${lengthSeconds}s '$message'")
             true
         } catch (e: Exception) {
-            Log.w(TAG, "ACTION_SET_TIMER failed: \${e.message}")
+            Log.w(TAG, "ACTION_SET_TIMER failed: ${e.message}")
             false
         }
     }

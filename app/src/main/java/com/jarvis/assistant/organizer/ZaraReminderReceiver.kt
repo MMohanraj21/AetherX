@@ -24,7 +24,7 @@ class ZaraReminderReceiver : BroadcastReceiver() {
         val isAlarm = intent?.getBooleanExtra("EXTRA_IS_ALARM", false) ?: false
         val reminderId = intent?.getLongExtra("EXTRA_ID", System.currentTimeMillis()) ?: System.currentTimeMillis()
 
-        Log.i("ZaraReminderReceiver", "Triggered reminder: '\$title' (isAlarm=\$isAlarm)")
+        Log.i("ZaraReminderReceiver", "Triggered reminder: '$title' (isAlarm=$isAlarm)")
 
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 

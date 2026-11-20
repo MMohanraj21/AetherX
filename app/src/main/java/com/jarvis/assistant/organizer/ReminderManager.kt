@@ -61,9 +61,9 @@ class ReminderManager(private val context: Context) {
             } else {
                 alarmManager.setExact(AlarmManager.RTC_WAKEUP, reminder.triggerTimeMs, pendingIntent)
             }
-            Log.i("ReminderManager", "Scheduled reminder ID \${reminder.id} at \${reminder.triggerTimeMs}")
+            Log.i("ReminderManager", "Scheduled reminder ID ${reminder.id} at ${reminder.triggerTimeMs}")
         } catch (e: Exception) {
-            Log.e("ReminderManager", "Failed to schedule reminder alarm: \${e.message}")
+            Log.e("ReminderManager", "Failed to schedule reminder alarm: ${e.message}")
         }
     }
 }

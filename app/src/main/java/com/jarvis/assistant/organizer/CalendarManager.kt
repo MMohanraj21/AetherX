@@ -27,10 +27,10 @@ object CalendarManager {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
             context.startActivity(intent)
-            Log.i(TAG, "Calendar insert event triggered: '\$title'")
+            Log.i(TAG, "Calendar insert event triggered: '$title'")
             true
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to insert calendar event: \${e.message}")
+            Log.e(TAG, "Failed to insert calendar event: ${e.message}")
             false
         }
     }

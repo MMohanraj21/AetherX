@@ -23,70 +23,48 @@ class DailyBriefingManager(
 
         if (isTamil) {
             val sb = StringBuilder()
-            sb.append("வணக்கம்! இன்றைய (\${todayStr}) திட்டம்:
-
-")
+            sb.append("வணக்கம்! இன்றைய ($todayStr) திட்டம்:\n\n")
             if (tasks.isNotEmpty()) {
-                sb.append("📋 இன்றைய பணிகள் (\${tasks.size}):
-")
-                tasks.forEachIndexed { i, t -> sb.append("\${i + 1}. \${t.title} [\${t.priority}]
-") }
+                sb.append("📋 இன்றைய பணிகள் (${tasks.size}):\n")
+                tasks.forEachIndexed { i, t -> sb.append("${i + 1}. ${t.title} [${t.priority}]\n") }
             } else {
-                sb.append("📋 இன்றைய பணிகள் எதுவும் நிலுவையில் இல்லை.
-")
+                sb.append("📋 இன்றைய பணிகள் எதுவும் நிலுவையில் இல்லை.\n")
             }
 
             if (reminders.isNotEmpty()) {
-                sb.append("
-⏰ வரவிருக்கும் நினைவூட்டல்கள்:
-")
+                sb.append("\n⏰ வரவிருக்கும் நினைவூட்டல்கள்:\n")
                 reminders.forEachIndexed { i, r ->
                     val time = SimpleDateFormat("h:mm a", Locale.getDefault()).format(Date(r.triggerTimeMs))
-                    sb.append("\${i + 1}. \${r.title} - \${time}
-")
+                    sb.append("${i + 1}. ${r.title} - $time\n")
                 }
             }
 
             if (recentNotes.isNotEmpty()) {
-                sb.append("
-📝 சமீபத்திய குறிப்புகள்:
-")
-                recentNotes.forEach { n -> sb.append("• \${n.title}: \${n.content.take(50)}
-") }
+                sb.append("\n📝 சமீபத்திய குறிப்புகள்:\n")
+                recentNotes.forEach { n -> sb.append("• ${n.title}: ${n.content.take(50)}\n") }
             }
             sb.toString()
         } else {
             val sb = StringBuilder()
-            sb.append("Good day! Here is your daily plan for \${todayStr}:
-
-")
+            sb.append("Good day! Here is your daily plan for $todayStr:\n\n")
             if (tasks.isNotEmpty()) {
-                sb.append("📋 Pending Tasks (\${tasks.size}):
-")
-                tasks.forEachIndexed { i, t -> sb.append("\${i + 1}. \${t.title} (\${t.priority})
-") }
+                sb.append("📋 Pending Tasks (${tasks.size}):\n")
+                tasks.forEachIndexed { i, t -> sb.append("${i + 1}. ${t.title} (${t.priority})\n") }
             } else {
-                sb.append("📋 No pending tasks for today.
-")
+                sb.append("📋 No pending tasks for today.\n")
             }
 
             if (reminders.isNotEmpty()) {
-                sb.append("
-⏰ Upcoming Reminders:
-")
+                sb.append("\n⏰ Upcoming Reminders:\n")
                 reminders.forEachIndexed { i, r ->
                     val time = SimpleDateFormat("h:mm a", Locale.getDefault()).format(Date(r.triggerTimeMs))
-                    sb.append("\${i + 1}. \${r.title} at \${time}
-")
+                    sb.append("${i + 1}. ${r.title} at $time\n")
                 }
             }
 
             if (recentNotes.isNotEmpty()) {
-                sb.append("
-📝 Recent Notes:
-")
-                recentNotes.forEach { n -> sb.append("• \${n.title}: \${n.content.take(60)}
-") }
+                sb.append("\n📝 Recent Notes:\n")
+                recentNotes.forEach { n -> sb.append("• ${n.title}: ${n.content.take(60)}\n") }
             }
             sb.toString()
         }

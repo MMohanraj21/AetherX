@@ -53,12 +53,12 @@ class ZaraUtilityCommandParser(private val context: Context) {
                     } else if (minutesFromNow > 0) {
                         val ok = AlarmManagerHelper.createRelativeAlarm(context, minutesFromNow, message)
                         result.put("success", ok)
-                        result.put("message", "Alarm set for \$minutesFromNow minutes from now.")
+                        result.put("message", "Alarm set for $minutesFromNow minutes from now.")
                     } else if (hour >= 0) {
                         val ok = AlarmManagerHelper.createAlarm(context, hour, minute, message)
                         val timeStr = String.format("%02d:%02d", hour, minute)
                         result.put("success", ok)
-                        result.put("message", "Alarm set for \$timeStr.")
+                        result.put("message", "Alarm set for $timeStr.")
                     } else {
                         result.put("success", false)
                         result.put("message", "Please specify the time for the alarm.")
@@ -76,21 +76,21 @@ class ZaraUtilityCommandParser(private val context: Context) {
                             val note = notesManager.createNote(title, content, category)
                             result.put("success", true)
                             result.put("note_id", note.id)
-                            result.put("message", "Note '\${note.title}' saved successfully.")
+                            result.put("message", "Note '${note.title}' saved successfully.")
                         }
                         "search" -> {
                             val query = args.optString("query", title)
                             val notes = notesManager.searchNotes(query)
                             result.put("success", true)
                             result.put("count", notes.size)
-                            val summary = notes.joinToString("; ") { "\${it.title}: \${it.content.take(40)}" }
-                            result.put("message", if (notes.isNotEmpty()) "Found notes: \$summary" else "No matching notes found.")
+                            val summary = notes.joinToString("; ") { "${it.title}: ${it.content.take(40)}" }
+                            result.put("message", if (notes.isNotEmpty()) "Found notes: $summary" else "No matching notes found.")
                         }
                         "get_latest", "read_last" -> {
                             val latest = notesManager.getLatestNote()
                             result.put("success", latest != null)
                             if (latest != null) {
-                                result.put("message", "Latest note '\${latest.title}': \${latest.content}")
+                                result.put("message", "Latest note '${latest.title}': ${latest.content}")
                             } else {
                                 result.put("message", "No notes found.")
                             }
@@ -100,16 +100,16 @@ class ZaraUtilityCommandParser(private val context: Context) {
                             result.put("success", true)
                             result.put("count", notes.size)
                             val summary = notes.take(5).joinToString(", ") { it.title }
-                            result.put("message", if (notes.isNotEmpty()) "You have \${notes.size} notes: \$summary" else "You have no notes.")
+                            result.put("message", if (notes.isNotEmpty()) "You have ${notes.size} notes: $summary" else "You have no notes.")
                         }
                         "delete" -> {
                             val ok = notesManager.deleteNoteByTitle(title)
                             result.put("success", ok)
-                            result.put("message", if (ok) "Deleted note '\$title'" else "Note '\$title' not found.")
+                            result.put("message", if (ok) "Deleted note '$title'" else "Note '$title' not found.")
                         }
                         else -> {
                             result.put("success", false)
-                            result.put("message", "Unknown note action: \$action")
+                            result.put("message", "Unknown note action: $action")
                         }
                     }
                 }
@@ -139,19 +139,19 @@ class ZaraUtilityCommandParser(private val context: Context) {
                             val reminder = reminderManager.createReminder(title, cal.timeInMillis)
                             result.put("success", true)
                             result.put("reminder_id", reminder.id)
-                            result.put("message", "Reminder set for '\$title'.")
+                            result.put("message", "Reminder set for '$title'.")
                         }
                         "list", "get_all" -> {
                             val reminders = reminderManager.getPendingReminders()
                             result.put("success", true)
                             result.put("count", reminders.size)
                             val summary = reminders.joinToString(", ") { it.title }
-                            result.put("message", if (reminders.isNotEmpty()) "Upcoming reminders: \$summary" else "No pending reminders.")
+                            result.put("message", if (reminders.isNotEmpty()) "Upcoming reminders: $summary" else "No pending reminders.")
                         }
                         "cancel", "delete" -> {
                             val ok = reminderManager.cancelReminder(title)
                             result.put("success", ok)
-                            result.put("message", if (ok) "Cancelled reminder '\$title'" else "Reminder '\$title' not found.")
+                            result.put("message", if (ok) "Cancelled reminder '$title'" else "Reminder '$title' not found.")
                         }
                     }
                 }
@@ -163,8 +163,8 @@ class ZaraUtilityCommandParser(private val context: Context) {
                     result.put("success", ok)
                     val mins = lengthSeconds / 60
                     val secs = lengthSeconds % 60
-                    val formatted = if (mins > 0 && secs > 0) "\$mins minutes \$secs seconds" else if (mins > 0) "\$mins minutes" else "\$secs seconds"
-                    result.put("message", if (ok) "Timer started for \$formatted." else "Failed to start timer.")
+                    val formatted = if (mins > 0 && secs > 0) "$mins minutes $secs seconds" else if (mins > 0) "$mins minutes" else "$secs seconds"
+                    result.put("message", if (ok) "Timer started for $formatted." else "Failed to start timer.")
                 }
 
                 "manage_calendar" -> {
@@ -181,7 +181,7 @@ class ZaraUtilityCommandParser(private val context: Context) {
                     }
                     val ok = CalendarManager.createEvent(context, title, cal.timeInMillis)
                     result.put("success", ok)
-                    result.put("message", if (ok) "Calendar event '\$title' created." else "Could not open calendar.")
+                    result.put("message", if (ok) "Calendar event '$title' created." else "Could not open calendar.")
                 }
 
                 "manage_task" -> {
@@ -194,19 +194,19 @@ class ZaraUtilityCommandParser(private val context: Context) {
                             val task = taskManager.addTask(title, priority = priority)
                             result.put("success", true)
                             result.put("task_id", task.id)
-                            result.put("message", "Task '\${task.title}' added to your list.")
+                            result.put("message", "Task '${task.title}' added to your list.")
                         }
                         "list", "get_all" -> {
                             val tasks = taskManager.getPendingTasks()
                             result.put("success", true)
                             result.put("count", tasks.size)
                             val summary = tasks.joinToString(", ") { it.title }
-                            result.put("message", if (tasks.isNotEmpty()) "Pending tasks: \$summary" else "No pending tasks!")
+                            result.put("message", if (tasks.isNotEmpty()) "Pending tasks: $summary" else "No pending tasks!")
                         }
                         "complete", "mark_done" -> {
                             val ok = taskManager.completeTask(title)
                             result.put("success", ok)
-                            result.put("message", if (ok) "Marked '\$title' as completed." else "Task '\$title' not found.")
+                            result.put("message", if (ok) "Marked '$title' as completed." else "Task '$title' not found.")
                         }
                     }
                 }
@@ -221,13 +221,13 @@ class ZaraUtilityCommandParser(private val context: Context) {
 
                 else -> {
                     result.put("success", false)
-                    result.put("message", "Unsupported tool: \$name")
+                    result.put("message", "Unsupported tool: $name")
                 }
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Error executing tool '\$name': \${e.message}", e)
+            Log.e(TAG, "Error executing tool '$name': ${e.message}", e)
             result.put("success", false)
-            result.put("message", "Error: \${e.message}")
+            result.put("message", "Error: ${e.message}")
         }
         return result
     }

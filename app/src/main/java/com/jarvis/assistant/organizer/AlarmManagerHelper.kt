@@ -32,10 +32,10 @@ object AlarmManagerHelper {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
             context.startActivity(intent)
-            Log.i(TAG, "Alarm set via AlarmClock intent: \$hour:\$minute '\$message'")
+            Log.i(TAG, "Alarm set via AlarmClock intent: $hour:$minute '$message'")
             true
         } catch (e: Exception) {
-            Log.w(TAG, "ACTION_SET_ALARM failed, falling back to AlarmManager: \${e.message}")
+            Log.w(TAG, "ACTION_SET_ALARM failed, falling back to AlarmManager: ${e.message}")
             createFallbackAlarm(context, hour, minute, message)
         }
     }
@@ -60,7 +60,7 @@ object AlarmManagerHelper {
             context.startActivity(intent)
             true
         } catch (e: Exception) {
-            Log.w(TAG, "Cannot show alarms: \${e.message}")
+            Log.w(TAG, "Cannot show alarms: ${e.message}")
             false
         }
     }
@@ -82,7 +82,7 @@ object AlarmManagerHelper {
                 showAlarms(context)
             }
         } catch (e: Exception) {
-            Log.w(TAG, "Cannot dismiss alarm: \${e.message}")
+            Log.w(TAG, "Cannot dismiss alarm: ${e.message}")
             false
         }
     }
@@ -113,10 +113,10 @@ object AlarmManagerHelper {
             } else {
                 alarmManager.setExact(AlarmManager.RTC_WAKEUP, cal.timeInMillis, pendingIntent)
             }
-            Log.i(TAG, "Fallback precision alarm scheduled at \${cal.time}")
+            Log.i(TAG, "Fallback precision alarm scheduled at ${cal.time}")
             true
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to schedule fallback alarm: \${e.message}")
+            Log.e(TAG, "Failed to schedule fallback alarm: ${e.message}")
             false
         }
     }
