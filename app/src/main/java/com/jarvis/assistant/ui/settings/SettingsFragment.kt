@@ -66,7 +66,7 @@ class SettingsFragment : Fragment() {
     private fun loadUserData() {
         val userName = preferences.userName.ifBlank { "Rehaan" }
         binding.tvProfileName.text = userName
-        binding.tvProfileSubtitle.text = "JARVIS OPERATOR • PRIMARY USER"
+        binding.tvProfileSubtitle.text = "ZARA OPERATOR • PRIMARY USER"
 
         // Owner Voice Profile Status
         val hasVoiceProfile = preferences.hasOwnerVoiceProfile()
@@ -169,6 +169,10 @@ class SettingsFragment : Fragment() {
             startActivity(Intent(requireContext(), OverlayAvatarActivity::class.java))
         }
 
+        
+        binding.rowDefaultAssistant.setOnClickListener {
+            openDefaultAssistantSettings()
+        }
         binding.rowApplications.setOnClickListener {
             startActivity(Intent(requireContext(), HandsFreeActivity::class.java))
         }
@@ -184,7 +188,7 @@ class SettingsFragment : Fragment() {
 
         binding.rowAppIdentity.setOnClickListener {
             MaterialAlertDialogBuilder(requireContext())
-                .setTitle("JARVIS App Identity")
+                .setTitle("Zara App Identity")
                 .setMessage(com.jarvis.assistant.security.AppIdentityVerifier.report(requireContext()))
                 .setPositiveButton("Close", null)
                 .show()
@@ -209,6 +213,22 @@ class SettingsFragment : Fragment() {
         }
     }
 
+    
+    private fun openDefaultAssistantSettings() {
+        val intents = listOf(
+            android.content.Intent(android.provider.Settings.ACTION_VOICE_INPUT_SETTINGS),
+            android.content.Intent("android.settings.VOICE_INPUT_SETTINGS"),
+            android.content.Intent(android.provider.Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS),
+            android.content.Intent(android.provider.Settings.ACTION_SETTINGS)
+        )
+        for (intent in intents) {
+            try {
+                startActivity(intent)
+                return
+            } catch (_: Exception) {}
+        }
+    }
+
     private fun showLanguageDialog() {
         val languages = GeminiConstants.SUPPORTED_LANGUAGES.toTypedArray()
         val currentIndex = languages.indexOfFirst { it.equals(preferences.language, ignoreCase = true) }.let { if (it >= 0) it else 0 }
@@ -228,7 +248,7 @@ class SettingsFragment : Fragment() {
     private fun showWakeWordDialog() {
         MaterialAlertDialogBuilder(requireContext())
             .setTitle("Wake Words & Sensitivity")
-            .setMessage("• Wake Words: 'Jarvis', 'Hey Jarvis'\n• Acoustic Trigger: Double Clap detection\n• Standby Mode: Low-power local Vosk offline engine\n\nWhen standby listening is active, Jarvis awakens instantly upon hearing your voice.")
+            .setMessage("• Wake Words: 'Zara', 'Hey Zara'\n• Acoustic Trigger: Double Clap detection\n• Standby Mode: Low-power local Vosk offline engine\n\nWhen standby listening is active, Zara awakens instantly upon hearing your voice.")
             .setPositiveButton("Got It", null)
             .show()
     }
@@ -236,7 +256,7 @@ class SettingsFragment : Fragment() {
     private fun showAppAutomationDialog() {
         MaterialAlertDialogBuilder(requireContext())
             .setTitle("Autonomous App Automation")
-            .setMessage("Jarvis is integrated with your device capabilities:\n\n• WhatsApp: Hands-free messaging & calls\n• YouTube: Search and playback automation\n• Phone Controls: Flashlight, Volume, Brightness, Bluetooth\n• Apps & Tools: Launch, search, and manage apps via voice")
+            .setMessage("Zara is integrated with your device capabilities:\n\n• WhatsApp: Hands-free messaging & calls\n• YouTube: Search and playback automation\n• Phone Controls: Flashlight, Volume, Brightness, Bluetooth\n• Apps & Tools: Launch, search, and manage apps via voice")
             .setPositiveButton("Close", null)
             .show()
     }
@@ -248,7 +268,7 @@ class SettingsFragment : Fragment() {
         }
         MaterialAlertDialogBuilder(requireContext())
             .setTitle("Operator Name")
-            .setMessage("Enter the name Jarvis should use to address you:")
+            .setMessage("Enter the name Zara should use to address you:")
             .setView(input)
             .setPositiveButton("Save") { _, _ ->
                 val newName = input.text.toString().trim()

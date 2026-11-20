@@ -119,7 +119,7 @@
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
-            <!-- 1. Jarvis Pro (Default) -->
+            <!-- 1. Zara Pro (Default) -->
             <LinearLayout
                 android:id="@+id/cardPersonaJarvis"
                 android:layout_width="match_parent"

@@ -104,7 +104,7 @@ class PersonaActivity : AppCompatActivity() {
             GeminiConstants.PERSONALITY_GIRLFRIEND -> "Pari"
             GeminiConstants.PERSONALITY_BOYFRIEND -> "Kabir"
             GeminiConstants.PERSONALITY_TECHGPT_X -> "Mohanraj"
-            else -> "Jarvis Pro"
+            else -> "Zara Pro"
         }
         val operator = binding.etUserName.text?.toString()?.trim().takeUnless { it.isNullOrBlank() } ?: "Mohanraj"
         binding.tvPersonaPreview.text = "$persona · ${getSelectedVoice()}"
@@ -148,7 +148,7 @@ class PersonaActivity : AppCompatActivity() {
             GeminiConstants.PERSONALITY_GIRLFRIEND -> "Pari (Girlfriend Mode)"
             GeminiConstants.PERSONALITY_BOYFRIEND -> "Kabir (Boyfriend Mode)"
             GeminiConstants.PERSONALITY_TECHGPT_X -> "Zara AI Neural Core"
-            else -> "Jarvis Pro"
+            else -> "Zara Pro"
         }
 
         Toast.makeText(
