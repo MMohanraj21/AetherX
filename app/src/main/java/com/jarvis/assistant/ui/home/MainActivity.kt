@@ -220,11 +220,11 @@ class MainActivity : AppCompatActivity() {
         outState.putInt("CURRENT_TAB", currentTab)
     }
 
-    override fun onNewIntent(intent: Intent?) {
+    override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        if (intent?.getBooleanExtra("EXTRA_VOICE_TRIGGER", false) == true ||
-            intent?.getBooleanExtra("EXTRA_WAKE_WORD_ACTIVATED", false) == true
+        if (intent.getBooleanExtra("EXTRA_VOICE_TRIGGER", false) ||
+            intent.getBooleanExtra("EXTRA_WAKE_WORD_ACTIVATED", false)
         ) {
             selectTab(TAB_HOME)
         }
