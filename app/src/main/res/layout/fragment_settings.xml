@@ -629,7 +629,7 @@
                             android:layout_width="22dp"
                             android:layout_height="22dp"
                             android:layout_gravity="center"
-                            android:src="@drawable/ic_settings_permissions"
+                            android:src="@drawable/ic_settings_apps"
                             app:tint="?attr/themeAccent"
                             android:contentDescription="Vivo Settings" />
                     </FrameLayout>
@@ -663,7 +663,7 @@
                     <ImageView
                         android:layout_width="16dp"
                         android:layout_height="16dp"
-                        android:src="@drawable/ic_chevron_right"
+                        android:src="@drawable/ic_arrow_right"
                         app:tint="?attr/themeTextMuted" />
                 </LinearLayout>
             </LinearLayout>
