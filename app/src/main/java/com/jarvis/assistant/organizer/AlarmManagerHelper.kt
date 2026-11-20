@@ -70,7 +70,7 @@ object AlarmManagerHelper {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                 val intent = Intent(AlarmClock.ACTION_DISMISS_ALARM).apply {
                     if (search.isNotBlank()) {
-                        putExtra(AlarmClock.EXTRA_SEARCH_MODE, AlarmClock.ALARM_SEARCH_MODE_LABEL)
+                        putExtra("android.intent.extra.alarm.SEARCH_MODE", "android.label")
                         putExtra(AlarmClock.EXTRA_MESSAGE, search)
                     }
                     putExtra(AlarmClock.EXTRA_SKIP_UI, true)

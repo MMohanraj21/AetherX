@@ -388,11 +388,11 @@ class SettingsFragment : Fragment() {
                     }
                     startActivity(intent)
                 } catch (e: Exception) {
-                    com.jarvis.assistant.util.PermissionHelper.openBatteryOptimizationSettings(requireContext())
+                    com.jarvis.assistant.util.PermissionHelper.requestBatteryOptimization(requireContext())
                 }
             }
             .setNeutralButton("Battery Optimization") { _, _ ->
-                com.jarvis.assistant.util.PermissionHelper.openBatteryOptimizationSettings(requireContext())
+                com.jarvis.assistant.util.PermissionHelper.requestBatteryOptimization(requireContext())
             }
             .setNegativeButton("Done", null)
             .show()
