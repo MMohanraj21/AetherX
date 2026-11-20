@@ -804,12 +804,24 @@ class JarvisConversationService : Service() {
         audioPlayer = AudioPlayer(
             onPlaybackStateChanged = { isPlaying ->
                 if (isPlaying) {
+                    com.jarvis.assistant.audio.WakeWordManager.transitionTo(com.jarvis.assistant.audio.VoiceCycleState.SPEAKING, "Audio playback started")
                     setConversationState(ConversationState.SPEAKING)
                 } else {
                     lastPlaybackEndTime = System.currentTimeMillis()
                     finalizeTurn()
+                    com.jarvis.assistant.audio.WakeWordManager.transitionTo(com.jarvis.assistant.audio.VoiceCycleState.RESUMING_WAKE_WORD, "Voice turn completed")
                     if (_isSessionOn.value) {
                         setConversationState(ConversationState.IDLE)
+                        val isForeground = com.jarvis.assistant.JarvisApp.isAppForeground.value
+                        if (!isForeground && preferences.isWakeWordEnabled) {
+                            serviceScope.launch(Dispatchers.Main) {
+                                delay(2000L)
+                                if (_isSessionOn.value && _conversationState.value == ConversationState.IDLE && !hasSpeechInCurrentUtterance) {
+                                    enterStandby(announce = false)
+                                    com.jarvis.assistant.audio.WakeWordManager.logEvent("WAKEWORD_RECOVERED", "Resumed standby after background conversation turn")
+                                }
+                            }
+                        }
                     }
                 }
             },
@@ -1578,6 +1590,13 @@ class JarvisConversationService : Service() {
                                             lastResponseTimedOut = true
                                             updateNotification()
                                             serviceScope.launch { _events.emit("Zara did not receive a reply. Check the connection and repeat your request.") }
+                                            if (!com.jarvis.assistant.JarvisApp.isAppForeground.value && preferences.isWakeWordEnabled) {
+                                                serviceScope.launch(Dispatchers.Main) {
+                                                    delay(1500L)
+                                                    enterStandby(announce = false)
+                                                    com.jarvis.assistant.audio.WakeWordManager.logEvent("WAKEWORD_RECOVERED", "Recovered standby after thinking timeout")
+                                                }
+                                            }
                                         }
                                     }
                                 }
@@ -2319,6 +2338,16 @@ class JarvisConversationService : Service() {
                         result.put("message", "Screen inspected successfully.")
                     }
 
+                    "manage_alarm", "manage_note", "manage_reminder", "manage_timer", "manage_calendar", "manage_task", "get_daily_briefing" -> {
+                        val utilityParser = com.jarvis.assistant.organizer.ZaraUtilityCommandParser(this@JarvisConversationService)
+                        val res = utilityParser.executeTool(name, args)
+                        val keys = res.keys()
+                        while (keys.hasNext()) {
+                            val k = keys.next()
+                            result.put(k, res.get(k))
+                        }
+                    }
+
 
                     else -> {
                         Log.w("JarvisService", "Unknown toolCall name: $name")
@@ -2961,6 +2990,8 @@ class JarvisConversationService : Service() {
         _isStandby.value = true
         standbyActivatedTime = System.currentTimeMillis()
         updateNotification()
+        com.jarvis.assistant.audio.WakeWordManager.updateServiceWakeActive(true)
+        com.jarvis.assistant.audio.WakeWordManager.transitionTo(com.jarvis.assistant.audio.VoiceCycleState.IDLE, "Entered standby listening")
 
         serviceScope.launch(Dispatchers.Main) {
             delay(500)
@@ -2972,6 +3003,8 @@ class JarvisConversationService : Service() {
 
     private fun exitStandbyListening() {
         _isStandby.value = false
+        com.jarvis.assistant.audio.WakeWordManager.updateServiceWakeActive(false)
+        com.jarvis.assistant.audio.WakeWordManager.logEvent("AUDIO_ENGINE_STOPPED", "Vosk standby listening stopped")
         try {
             voskSpeechService?.stop()
         } catch (e: Exception) {
@@ -3206,6 +3239,7 @@ class JarvisConversationService : Service() {
 
     private fun onWakeWordDetected() {
         if (!_isStandby.value) return
+        com.jarvis.assistant.audio.WakeWordManager.transitionTo(com.jarvis.assistant.audio.VoiceCycleState.WAKE_WORD_DETECTED, "Vosk detected wake word")
         requestAudioDuckFocus()
         vibrateBriefly()
         com.jarvis.assistant.audio.JarvisSoundEffects.playWakeSound()
@@ -3217,9 +3251,11 @@ class JarvisConversationService : Service() {
         serviceScope.launch { _wakeEvents.emit(Unit) }
 
         // Launch ZARA conversation interface seamlessly from background / lock screen
+        com.jarvis.assistant.audio.WakeWordManager.transitionTo(com.jarvis.assistant.audio.VoiceCycleState.ACTIVATING, "Launching interface")
         launchAssistantUiFromBackground()
 
         // Open microphone immediately on foreground service so command is heard without delay
+        com.jarvis.assistant.audio.WakeWordManager.transitionTo(com.jarvis.assistant.audio.VoiceCycleState.LISTENING, "Listening for voice command")
         beginActiveConversation(wakeTriggered = true)
     }
 
@@ -3357,6 +3393,8 @@ class JarvisConversationService : Service() {
     }
 
     override fun onDestroy() {
+        com.jarvis.assistant.audio.WakeWordManager.logEvent("SERVICE_DESTROYED", "JarvisConversationService destroyed")
+        com.jarvis.assistant.audio.WakeWordManager.logEvent("AUDIO_ENGINE_STOPPED", "Audio engine stopped in onDestroy")
         com.jarvis.assistant.island.ZaraIslandManager.getInstance(this).hideIsland()
         taskProgressOverlayJob?.cancel()
         taskProgressOverlayJob = null
@@ -3376,6 +3414,26 @@ class JarvisConversationService : Service() {
         releaseWakeLock()
         serviceScope.cancel()
         if (activeInstance === this) activeInstance = null
+
+        // Persistent Wake Word: If user has Always Ready enabled, re-arm service via AlarmManager
+        if (preferences.isWakeWordEnabled) {
+            try {
+                val restartIntent = Intent(applicationContext, JarvisConversationService::class.java).apply {
+                    action = ACTION_ENTER_STANDBY
+                }
+                val restartPendingIntent = PendingIntent.getService(
+                    applicationContext,
+                    8888,
+                    restartIntent,
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                )
+                val alarmManager = getSystemService(Context.ALARM_SERVICE) as? android.app.AlarmManager
+                alarmManager?.set(android.app.AlarmManager.RTC_WAKEUP, System.currentTimeMillis() + 1000L, restartPendingIntent)
+                com.jarvis.assistant.audio.WakeWordManager.logEvent("WAKEWORD_RECOVERED", "Scheduled restart for persistent wake-word standby")
+            } catch (e: Exception) {
+                Log.e("JarvisService", "Failed to schedule wake-word restart: ${e.message}")
+            }
+        }
         super.onDestroy()
     }
 

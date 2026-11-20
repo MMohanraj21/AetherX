@@ -455,7 +455,7 @@ class MemoryManager(
                 val j = turn.jarvisResponse.trim()
                 if (u.isNotBlank() && j.isNotBlank() && u != "(Audio query)" && j != "(Audio response)") {
                     sb.append("User: \"$u\"\n")
-                    sb.append("JARVIS: \"$j\"\n")
+                    sb.append("ZARA: \"$j\"\n")
                 }
             }
         }

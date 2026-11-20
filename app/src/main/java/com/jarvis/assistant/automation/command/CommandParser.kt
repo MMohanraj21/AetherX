@@ -493,7 +493,7 @@ object CommandParser {
         }
 
         // 10b. Go To Background / Standby
-        if (clean.matches(Regex("$prefix(?:go\\s+to\\s+background|go\\s+background|go\\s+in\\s+background|go\\s+in\\s+the\\s+background|minimize|go\\s+to\\s+home\\s+screen|go\\s+home|background\\s+me\\s+jao|background\\s+mein\\s+jao|background\\s+ki\\s+vellu|background\\s+po|background\\s+ch\\s+jao|background\\s+la\\s+ja|background\\s+e\\s+jao|send\\s+to\\s+background|go\\s+to\\s+sleep|sleep\\s+jarvis|enter\\s+standby|standby\\s+mode|so\\s+jao|paduko|sleep)$", RegexOption.IGNORE_CASE))) {
+        if (clean.matches(Regex("$prefix(?:go\\s+to\\s+background|go\\s+background|go\\s+in\\s+background|go\\s+in\\s+the\\s+background|minimize|go\\s+to\\s+home\\s+screen|go\\s+home|background\\s+me\\s+jao|background\\s+mein\\s+jao|background\\s+ki\\s+vellu|background\\s+po|background\\s+ch\\s+jao|background\\s+la\\s+ja|background\\s+e\\s+jao|send\\s+to\\s+background|go\\s+to\\s+sleep|sleep\\s+(?:zara|jarvis)|enter\\s+standby|standby\\s+mode|so\\s+jao|paduko|sleep)$", RegexOption.IGNORE_CASE))) {
             return ParsedCommandResult(JarvisCommand.GoToBackground, 1.0f, "GO_TO_BACKGROUND")
         }
 

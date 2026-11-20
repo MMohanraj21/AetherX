@@ -642,6 +642,181 @@ class GeminiLiveWebSocket(
                                 put("properties", JSONObject())
                             })
                         })
+                        // 22. manage_alarm
+                        put(JSONObject().apply {
+                            put("name", "manage_alarm")
+                            put("description", "Sets, shows, or cancels alarms on the device. Supports Tamil, English, and Tanglish (e.g. 'Set alarm for 6 AM', 'Tomorrow 7 AM wake me up', 'காலை 6 மணிக்கு alarm வை', 'Cancel my 6 AM alarm', 'Show my alarms', 'Set alarm after 30 minutes').")
+                            put("parameters", JSONObject().apply {
+                                put("type", "OBJECT")
+                                put("properties", JSONObject().apply {
+                                    put("action", JSONObject().apply {
+                                        put("type", "STRING")
+                                        put("description", "The action: 'create', 'cancel', 'show', or 'relative'.")
+                                    })
+                                    put("hour", JSONObject().apply {
+                                        put("type", "INTEGER")
+                                        put("description", "Hour of day (0-23) in 24-hour format.")
+                                    })
+                                    put("minute", JSONObject().apply {
+                                        put("type", "INTEGER")
+                                        put("description", "Minute (0-59).")
+                                    })
+                                    put("message", JSONObject().apply {
+                                        put("type", "STRING")
+                                        put("description", "Alarm label or message.")
+                                    })
+                                    put("minutes_from_now", JSONObject().apply {
+                                        put("type", "INTEGER")
+                                        put("description", "For relative alarms, number of minutes from now (e.g. 30).")
+                                    })
+                                })
+                            })
+                        })
+
+                        // 23. manage_note
+                        put(JSONObject().apply {
+                            put("name", "manage_note")
+                            put("description", "Voice-controlled notes with Room database persistence. Actions: 'create', 'search', 'get_latest', 'get_all', 'delete'. Categories: Personal, Work, Education, Shopping, Ideas, Important, General. E.g. 'ZARA take a note', 'Remember this: Buy laptop', 'Show notes', 'Read my last note', 'Search notes for project').")
+                            put("parameters", JSONObject().apply {
+                                put("type", "OBJECT")
+                                put("properties", JSONObject().apply {
+                                    put("action", JSONObject().apply {
+                                        put("type", "STRING")
+                                        put("description", "Action: 'create', 'search', 'get_latest', 'get_all', 'delete'.")
+                                    })
+                                    put("title", JSONObject().apply {
+                                        put("type", "STRING")
+                                        put("description", "Note title or search query.")
+                                    })
+                                    put("content", JSONObject().apply {
+                                        put("type", "STRING")
+                                        put("description", "Note body text.")
+                                    })
+                                    put("category", JSONObject().apply {
+                                        put("type", "STRING")
+                                        put("description", "Category: Personal, Work, Education, Shopping, Ideas, Important, General.")
+                                    })
+                                })
+                            })
+                        })
+
+                        // 24. manage_reminder
+                        put(JSONObject().apply {
+                            put("name", "manage_reminder")
+                            put("description", "Creates precision reminders using AlarmManager with notification alerts. Actions: 'create', 'list', 'cancel'. E.g. 'Remind me to call mom at 6 PM', 'Remind me tomorrow to submit documents', 'Cancel reminder').")
+                            put("parameters", JSONObject().apply {
+                                put("type", "OBJECT")
+                                put("properties", JSONObject().apply {
+                                    put("action", JSONObject().apply {
+                                        put("type", "STRING")
+                                        put("description", "Action: 'create', 'list', 'cancel'.")
+                                    })
+                                    put("title", JSONObject().apply {
+                                        put("type", "STRING")
+                                        put("description", "What to remind the user about.")
+                                    })
+                                    put("minutes_from_now", JSONObject().apply {
+                                        put("type", "INTEGER")
+                                        put("description", "Optional delay in minutes.")
+                                    })
+                                    put("hour", JSONObject().apply {
+                                        put("type", "INTEGER")
+                                        put("description", "Target hour (0-23).")
+                                    })
+                                    put("minute", JSONObject().apply {
+                                        put("type", "INTEGER")
+                                        put("description", "Target minute (0-59).")
+                                    })
+                                })
+                            })
+                        })
+
+                        // 25. manage_timer
+                        put(JSONObject().apply {
+                            put("name", "manage_timer")
+                            put("description", "Starts countdown timers with alarm sounds. E.g. 'Set a timer for 10 minutes', 'Timer 5 mins', 'Start stopwatch').")
+                            put("parameters", JSONObject().apply {
+                                put("type", "OBJECT")
+                                put("properties", JSONObject().apply {
+                                    put("length_seconds", JSONObject().apply {
+                                        put("type", "INTEGER")
+                                        put("description", "Timer duration in seconds (e.g. 600 for 10 mins).")
+                                    })
+                                    put("message", JSONObject().apply {
+                                        put("type", "STRING")
+                                        put("description", "Timer label.")
+                                    })
+                                })
+                                put("required", JSONArray().put("length_seconds"))
+                            })
+                        })
+
+                        // 26. manage_calendar
+                        put(JSONObject().apply {
+                            put("name", "manage_calendar")
+                            put("description", "Inserts calendar events into Android Calendar. E.g. 'Add meeting with team tomorrow at 10 AM', 'Create calendar event').")
+                            put("parameters", JSONObject().apply {
+                                put("type", "OBJECT")
+                                put("properties", JSONObject().apply {
+                                    put("title", JSONObject().apply {
+                                        put("type", "STRING")
+                                        put("description", "Title of the calendar event.")
+                                    })
+                                    put("hour", JSONObject().apply {
+                                        put("type", "INTEGER")
+                                        put("description", "Event start hour (0-23).")
+                                    })
+                                    put("minute", JSONObject().apply {
+                                        put("type", "INTEGER")
+                                        put("description", "Event start minute (0-59).")
+                                    })
+                                    put("description", JSONObject().apply {
+                                        put("type", "STRING")
+                                        put("description", "Optional details or description.")
+                                    })
+                                })
+                                put("required", JSONArray().put("title"))
+                            })
+                        })
+
+                        // 27. manage_task
+                        put(JSONObject().apply {
+                            put("name", "manage_task")
+                            put("description", "Manages to-do tasks in Room database. Actions: 'add', 'list', 'complete'. E.g. 'Add finish my project to tasks', 'Show pending tasks', 'Mark project as completed').")
+                            put("parameters", JSONObject().apply {
+                                put("type", "OBJECT")
+                                put("properties", JSONObject().apply {
+                                    put("action", JSONObject().apply {
+                                        put("type", "STRING")
+                                        put("description", "Action: 'add', 'list', 'complete'.")
+                                    })
+                                    put("title", JSONObject().apply {
+                                        put("type", "STRING")
+                                        put("description", "Task title.")
+                                    })
+                                    put("priority", JSONObject().apply {
+                                        put("type", "STRING")
+                                        put("description", "Priority: 'HIGH', 'MEDIUM', 'LOW'.")
+                                    })
+                                })
+                            })
+                        })
+
+                        // 28. get_daily_briefing
+                        put(JSONObject().apply {
+                            put("name", "get_daily_briefing")
+                            put("description", "Summarizes today's agenda: upcoming alarms, pending reminders, calendar events, tasks, and recent notes. Call when user asks 'What is my plan for today?', 'Daily briefing', 'இன்றைய திட்டம் என்ன?').")
+                            put("parameters", JSONObject().apply {
+                                put("type", "OBJECT")
+                                put("properties", JSONObject().apply {
+                                    put("language", JSONObject().apply {
+                                        put("type", "STRING")
+                                        put("description", "User's current language (Tamil, English, Tanglish).")
+                                    })
+                                })
+                            })
+                        })
+
 
 
                     })

@@ -200,19 +200,38 @@ class MainActivity : AppCompatActivity() {
         setupNavigationDock()
         selectTab(currentTab)
         observeViewModel()
+        handleAssistIntent(intent)
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
                 if (currentTab != TAB_HOME) {
                     selectTab(TAB_HOME)
                 } else {
                     // Preserve Android's normal root behavior (return to launcher) only
-                    // after the user is already on JARVIS Home.
+                    // after the user is already on Zara Home.
                     isEnabled = false
                     onBackPressedDispatcher.onBackPressed()
                     isEnabled = true
                 }
             }
         })
+    }
+
+    private fun handleAssistIntent(intent: Intent?) {
+        if (intent == null) return
+        val isAssistAction = intent.action == Intent.ACTION_ASSIST ||
+                intent.action == Intent.ACTION_VOICE_COMMAND ||
+                intent.action == "android.intent.action.VOICE_ASSIST"
+        val isVoiceTrigger = intent.getBooleanExtra("EXTRA_VOICE_TRIGGER", false) ||
+                intent.getBooleanExtra("EXTRA_WAKE_WORD_ACTIVATED", false)
+
+        if (isAssistAction || isVoiceTrigger) {
+            selectTab(TAB_HOME)
+            binding.root.postDelayed({
+                if (!JarvisConversationService.isSessionOn.value) {
+                    checkPermissionsAndStart()
+                }
+            }, 300L)
+        }
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
@@ -223,11 +242,7 @@ class MainActivity : AppCompatActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        if (intent.getBooleanExtra("EXTRA_VOICE_TRIGGER", false) ||
-            intent.getBooleanExtra("EXTRA_WAKE_WORD_ACTIVATED", false)
-        ) {
-            selectTab(TAB_HOME)
-        }
+        handleAssistIntent(intent)
     }
 
     override fun onResume() {
@@ -439,18 +454,60 @@ class MainActivity : AppCompatActivity() {
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 launch {
-                    combine(viewModel.isMicMuted, viewModel.conversationState, viewModel.isSessionOn) { isMuted, state, isOn ->
-                        Triple(isMuted, state, isOn)
-                    }.collect { (isMuted, state, isOn) ->
-                        val tvAccent = android.util.TypedValue()
-                        theme.resolveAttribute(R.attr.themeAccent, tvAccent, true)
-                        val accentColor = if (tvAccent.data != 0) tvAccent.data else ContextCompat.getColor(this@MainActivity, R.color.accent_sapphire)
+                    combine(
+                        viewModel.isMicMuted,
+                        viewModel.conversationState,
+                        viewModel.isSessionOn,
+                        JarvisConversationService.isStandby
+                    ) { isMuted, state, isOn, isStandby ->
+                        listOf(isMuted, state, isOn, isStandby)
+                    }.collect { list ->
+                        val isMuted = list[0] as Boolean
+                        val state = list[1] as ConversationState
+                        val isOn = list[2] as Boolean
+                        val isStandby = list[3] as Boolean
+                        val isWakeWordEnabled = com.jarvis.assistant.JarvisApp.instance.preferences.isWakeWordEnabled
 
-                        val tvMuted = android.util.TypedValue()
-                        theme.resolveAttribute(R.attr.themeTextMuted, tvMuted, true)
-                        val inactiveColor = if (tvMuted.data != 0) tvMuted.data else ContextCompat.getColor(this@MainActivity, R.color.text_subtle)
-
-                        if (!isOn) {
+                        if (isOn) {
+                            if (isMuted) {
+                                binding.ivTabMic.setImageResource(R.drawable.ic_mic_mute_jarvis)
+                                binding.ivTabMic.imageTintList = ColorStateList.valueOf(android.graphics.Color.WHITE)
+                                binding.tvTabMic.setTextColor(android.graphics.Color.WHITE)
+                                binding.pillTabMic.setBackgroundResource(R.drawable.bg_dock_mic_muted)
+                                binding.pillTabMic.animate().cancel()
+                                binding.pillTabMic.alpha = 1f
+                                binding.pillTabMic.scaleX = 1f
+                                binding.pillTabMic.scaleY = 1f
+                            } else {
+                                binding.ivTabMic.setImageResource(R.drawable.ic_mic_jarvis)
+                                binding.ivTabMic.imageTintList = ColorStateList.valueOf(android.graphics.Color.WHITE)
+                                binding.tvTabMic.setTextColor(android.graphics.Color.WHITE)
+                                binding.pillTabMic.setBackgroundResource(R.drawable.bg_dock_mic_highlight)
+                                binding.pillTabMic.alpha = 1f
+                                if (state == ConversationState.LISTENING || state == ConversationState.SPEAKING) {
+                                    binding.pillTabMic.animate()
+                                        .scaleX(1.08f)
+                                        .scaleY(1.08f)
+                                        .setDuration(300)
+                                        .start()
+                                } else {
+                                    binding.pillTabMic.animate().cancel()
+                                    binding.pillTabMic.scaleX = 1f
+                                    binding.pillTabMic.scaleY = 1f
+                                }
+                            }
+                        } else if (isWakeWordEnabled || isStandby) {
+                            // ALWAYS READY STATE: Active green/cyan mic indicator
+                            binding.ivTabMic.setImageResource(R.drawable.ic_mic_jarvis)
+                            binding.ivTabMic.imageTintList = ColorStateList.valueOf(android.graphics.Color.parseColor("#10B981"))
+                            binding.tvTabMic.setTextColor(android.graphics.Color.parseColor("#10B981"))
+                            binding.pillTabMic.setBackgroundResource(R.drawable.bg_dock_mic_highlight)
+                            binding.pillTabMic.animate().cancel()
+                            binding.pillTabMic.alpha = 1f
+                            binding.pillTabMic.scaleX = 1f
+                            binding.pillTabMic.scaleY = 1f
+                        } else {
+                            // EXPLICITLY OFF STATE
                             binding.ivTabMic.setImageResource(R.drawable.ic_mic_jarvis)
                             binding.ivTabMic.imageTintList = ColorStateList.valueOf(android.graphics.Color.parseColor("#94A3B8"))
                             binding.tvTabMic.setTextColor(android.graphics.Color.parseColor("#94A3B8"))
@@ -459,32 +516,6 @@ class MainActivity : AppCompatActivity() {
                             binding.pillTabMic.alpha = 0.85f
                             binding.pillTabMic.scaleX = 1f
                             binding.pillTabMic.scaleY = 1f
-                        } else if (isMuted) {
-                            binding.ivTabMic.setImageResource(R.drawable.ic_mic_mute_jarvis)
-                            binding.ivTabMic.imageTintList = ColorStateList.valueOf(android.graphics.Color.WHITE)
-                            binding.tvTabMic.setTextColor(android.graphics.Color.WHITE)
-                            binding.pillTabMic.setBackgroundResource(R.drawable.bg_dock_mic_muted)
-                            binding.pillTabMic.animate().cancel()
-                            binding.pillTabMic.alpha = 1f
-                            binding.pillTabMic.scaleX = 1f
-                            binding.pillTabMic.scaleY = 1f
-                        } else {
-                            binding.ivTabMic.setImageResource(R.drawable.ic_mic_jarvis)
-                            binding.ivTabMic.imageTintList = ColorStateList.valueOf(android.graphics.Color.WHITE)
-                            binding.tvTabMic.setTextColor(android.graphics.Color.WHITE)
-                            binding.pillTabMic.setBackgroundResource(R.drawable.bg_dock_mic_highlight)
-                            binding.pillTabMic.alpha = 1f
-                            if (state == ConversationState.LISTENING || state == ConversationState.SPEAKING) {
-                                binding.pillTabMic.animate()
-                                    .scaleX(1.08f)
-                                    .scaleY(1.08f)
-                                    .setDuration(300)
-                                    .start()
-                            } else {
-                                binding.pillTabMic.animate().cancel()
-                                binding.pillTabMic.scaleX = 1f
-                                binding.pillTabMic.scaleY = 1f
-                            }
                         }
                     }
                 }
@@ -500,5 +531,15 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }
+    }
+
+    override fun onPause() {
+        super.onPause()
+        com.jarvis.assistant.audio.WakeWordManager.logEvent("ACTIVITY_PAUSED", "MainActivity onPause")
+    }
+
+    override fun onDestroy() {
+        com.jarvis.assistant.audio.WakeWordManager.logEvent("ACTIVITY_DESTROYED", "MainActivity onDestroy")
+        super.onDestroy()
     }
 }

@@ -58,6 +58,7 @@ class AppPreferences(context: Context) {
         private const val KEY_OWNER_VOICE_ENABLED = "key_owner_voice_enabled"
         private const val KEY_OWNER_VOICE_PROFILE = "key_owner_voice_profile"
         private const val KEY_OWNER_VOICE_SAMPLES = "key_owner_voice_samples"
+        private const val KEY_WAKE_WORD_ENABLED = "key_wake_word_enabled"
         private const val KEY_OWNER_VOICE_THRESHOLD = "key_owner_voice_threshold"
         private const val KEY_OWNER_VOICE_SAMPLE_COUNT = "key_owner_voice_sample_count"
         private const val KEY_LANGUAGE = "key_language"
@@ -426,6 +427,17 @@ class AppPreferences(context: Context) {
         val json = gson.toJson(history)
         prefs.edit().putString(KEY_CHAT_HISTORY, json).apply()
     }
+
+    /**
+     * Controls whether ZARA AI is Always Ready and listening for the offline wake word "Hey Zara".
+     * Default is TRUE. This preference is never reset or overwritten during Activity lifecycle.
+     */
+    var isWakeWordEnabled: Boolean
+        get() = prefs.getBoolean(KEY_WAKE_WORD_ENABLED, true)
+        set(value) {
+            android.util.Log.i("WakeWordManager", "[WAKEWORD_PREFERENCE_CHANGED] isWakeWordEnabled=$value")
+            prefs.edit().putBoolean(KEY_WAKE_WORD_ENABLED, value).apply()
+        }
 
     fun clearChatHistory() {
         prefs.edit().remove(KEY_CHAT_HISTORY).apply()

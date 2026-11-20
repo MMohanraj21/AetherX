@@ -354,73 +354,62 @@ class HomeFragment : Fragment() {
                     ) { isOn, isMuted, state, isStandby ->
                         HomeStatusState(isOn, isMuted, state, isStandby)
                     }.collect { status ->
-                        if (!status.isOn) {
+                        val isWakeWordEnabled = preferences.isWakeWordEnabled
+                        if (status.isOn) {
+                            if (status.isMuted) {
+                                setOrbState("idle")
+                                binding.tvListeningStatus.text = "MIC MUTED (OFF) • TAP TO TALK"
+                                binding.tvListeningStatus.setTextColor(Color.parseColor("#EF4444"))
+                                binding.tvHoldHint.text = "Microphone is muted • Tap mic to unmute"
+                                binding.tvHoldHint.visibility = View.VISIBLE
+                                binding.dotStatusGlow.backgroundTintList = ColorStateList.valueOf(Color.parseColor("#EF4444"))
+                            } else {
+                                binding.tvHoldHint.visibility = View.VISIBLE
+                                when (status.state) {
+                                    ConversationState.LISTENING -> {
+                                        setOrbState("listening")
+                                        binding.tvListeningStatus.text = "MIC ON • LISTENING..."
+                                        binding.tvListeningStatus.setTextColor(Color.parseColor("#10B981"))
+                                        binding.tvHoldHint.text = "Speak now • Tap to mute • Hold to power off"
+                                        binding.dotStatusGlow.backgroundTintList = ColorStateList.valueOf(Color.parseColor("#10B981"))
+                                    }
+                                    ConversationState.SPEAKING -> {
+                                        setOrbState("speaking")
+                                        binding.tvListeningStatus.text = "ZARA SPEAKING..."
+                                        binding.tvListeningStatus.setTextColor(Color.parseColor("#06B6D4"))
+                                        binding.tvHoldHint.text = "Tap mic to interrupt"
+                                        binding.dotStatusGlow.backgroundTintList = ColorStateList.valueOf(Color.parseColor("#06B6D4"))
+                                    }
+                                    ConversationState.THINKING -> {
+                                        setOrbState("thinking")
+                                        binding.tvListeningStatus.text = "THINKING..."
+                                        binding.tvListeningStatus.setTextColor(Color.parseColor("#F59E0B"))
+                                        binding.tvHoldHint.text = "Processing request..."
+                                        binding.dotStatusGlow.backgroundTintList = ColorStateList.valueOf(Color.parseColor("#F59E0B"))
+                                    }
+                                    ConversationState.IDLE -> {
+                                        setOrbState("idle")
+                                        binding.tvListeningStatus.text = "MIC ON • READY"
+                                        binding.tvListeningStatus.setTextColor(Color.parseColor("#10B981"))
+                                        binding.tvHoldHint.text = "Tap to mute • Hold to power off"
+                                        binding.dotStatusGlow.backgroundTintList = ColorStateList.valueOf(Color.parseColor("#10B981"))
+                                    }
+                                }
+                            }
+                        } else if (isWakeWordEnabled || status.isStandby) {
+                            setOrbState("idle")
+                            binding.tvListeningStatus.text = "ALWAYS READY • SAY 'HEY ZARA'"
+                            binding.tvListeningStatus.setTextColor(Color.parseColor("#10B981"))
+                            binding.tvHoldHint.text = "Listening for wake word • Tap orb to talk"
+                            binding.tvHoldHint.visibility = View.VISIBLE
+                            binding.dotStatusGlow.backgroundTintList = ColorStateList.valueOf(Color.parseColor("#10B981"))
+                        } else {
                             setOrbState("idle")
                             binding.tvListeningStatus.text = "ZARA OFF • TAP TO START"
                             binding.tvListeningStatus.setTextColor(ContextCompat.getColor(requireContext(), R.color.text_subtle))
                             binding.tvHoldHint.text = "Tap mic or orb to power on"
                             binding.tvHoldHint.visibility = View.VISIBLE
-                            binding.dotStatusGlow.backgroundTintList = ColorStateList.valueOf(
-                                Color.parseColor("#64748B")
-                            )
-                        } else if (status.isMuted) {
-                            setOrbState("idle")
-                            binding.tvListeningStatus.text = "MIC MUTED (OFF) • TAP TO TALK"
-                            binding.tvListeningStatus.setTextColor(Color.parseColor("#EF4444"))
-                            binding.tvHoldHint.text = "Microphone is muted • Tap mic to unmute"
-                            binding.tvHoldHint.visibility = View.VISIBLE
-                            binding.dotStatusGlow.backgroundTintList = ColorStateList.valueOf(
-                                Color.parseColor("#EF4444")
-                            )
-                        } else if (status.isStandby) {
-                            setOrbState("idle")
-                            binding.tvListeningStatus.text = "STANDBY • SAY 'HEY ZARA'"
-                            binding.tvListeningStatus.setTextColor(Color.parseColor("#3B82F6"))
-                            binding.tvHoldHint.text = "Listening for wake word • Hold mic to power off"
-                            binding.tvHoldHint.visibility = View.VISIBLE
-                            binding.dotStatusGlow.backgroundTintList = ColorStateList.valueOf(
-                                Color.parseColor("#3B82F6")
-                            )
-                        } else {
-                            binding.tvHoldHint.visibility = View.VISIBLE
-                            when (status.state) {
-                                ConversationState.LISTENING -> {
-                                    setOrbState("listening")
-                                    binding.tvListeningStatus.text = "MIC ON • LISTENING..."
-                                    binding.tvListeningStatus.setTextColor(Color.parseColor("#10B981"))
-                                    binding.tvHoldHint.text = "Speak now • Tap to mute • Hold to power off"
-                                    binding.dotStatusGlow.backgroundTintList = ColorStateList.valueOf(
-                                        Color.parseColor("#10B981")
-                                    )
-                                }
-                                ConversationState.SPEAKING -> {
-                                    setOrbState("speaking")
-                                    binding.tvListeningStatus.text = "ZARA SPEAKING..."
-                                    binding.tvListeningStatus.setTextColor(Color.parseColor("#06B6D4"))
-                                    binding.tvHoldHint.text = "Tap mic to interrupt"
-                                    binding.dotStatusGlow.backgroundTintList = ColorStateList.valueOf(
-                                        Color.parseColor("#06B6D4")
-                                    )
-                                }
-                                ConversationState.THINKING -> {
-                                    setOrbState("thinking")
-                                    binding.tvListeningStatus.text = "THINKING..."
-                                    binding.tvListeningStatus.setTextColor(Color.parseColor("#F59E0B"))
-                                    binding.tvHoldHint.text = "Processing request..."
-                                    binding.dotStatusGlow.backgroundTintList = ColorStateList.valueOf(
-                                        Color.parseColor("#F59E0B")
-                                    )
-                                }
-                                ConversationState.IDLE -> {
-                                    setOrbState("idle")
-                                    binding.tvListeningStatus.text = "MIC ON • READY"
-                                    binding.tvListeningStatus.setTextColor(Color.parseColor("#10B981"))
-                                    binding.tvHoldHint.text = "Tap to mute • Hold to power off"
-                                    binding.dotStatusGlow.backgroundTintList = ColorStateList.valueOf(
-                                        Color.parseColor("#10B981")
-                                    )
-                                }
-                            }
+                            binding.dotStatusGlow.backgroundTintList = ColorStateList.valueOf(Color.parseColor("#64748B"))
                         }
                     }
                 }

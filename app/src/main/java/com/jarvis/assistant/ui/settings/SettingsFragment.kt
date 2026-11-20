@@ -108,6 +108,9 @@ class SettingsFragment : Fragment() {
         // Silent Execution Mode
         binding.switchSilentMode.isChecked = preferences.isSilentExecutionMode
 
+        // Always Ready (Wake Word)
+        binding.switchAlwaysReady.isChecked = com.jarvis.assistant.audio.WakeWordManager.isEnabled(requireContext())
+
         // Model
         val modelDisplay = preferences.aiModel.removePrefix("models/")
         binding.tvCurrentModel.text = "$modelDisplay • Live WebSocket"
@@ -157,6 +160,16 @@ class SettingsFragment : Fragment() {
             preferences.isSilentExecutionMode = isChecked
             val msg = if (isChecked) "Silent Execution Mode Enabled" else "Silent Execution Mode Disabled"
             Toast.makeText(requireContext(), msg, Toast.LENGTH_SHORT).show()
+        }
+
+        binding.switchAlwaysReady.setOnCheckedChangeListener { _, isChecked ->
+            com.jarvis.assistant.audio.WakeWordManager.setEnabled(requireContext(), isChecked)
+            val msg = if (isChecked) "Always Ready (Hey Zara) Enabled" else "Always Ready (Hey Zara) Disabled"
+            Toast.makeText(requireContext(), msg, Toast.LENGTH_SHORT).show()
+        }
+
+        binding.rowOemBackgroundGuide.setOnClickListener {
+            showOemBackgroundDialog()
         }
 
         // Section 2: System & Intelligence Data
@@ -357,6 +370,32 @@ class SettingsFragment : Fragment() {
         } catch (_: Exception) {
             Toast.makeText(requireContext(), "Unable to open link", Toast.LENGTH_SHORT).show()
         }
+    }
+
+    private fun showOemBackgroundDialog() {
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle("Vivo & OEM Background Setup")
+            .setMessage(
+                "To ensure 'Hey Zara' wakes up reliably 24/7 in the background without being restricted:\n\n" +
+                "1. Autostart: Allow Zara in Autostart / Background launch.\n" +
+                "2. Battery: Set Battery usage to 'Unrestricted' or 'High Background Power Consumption'.\n" +
+                "3. Lock in Recents: Lock Zara in Recent Apps screen so it isn't cleared."
+            )
+            .setPositiveButton("Open App Settings") { _, _ ->
+                try {
+                    val intent = Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                        data = Uri.fromParts("package", requireContext().packageName, null)
+                    }
+                    startActivity(intent)
+                } catch (e: Exception) {
+                    com.jarvis.assistant.util.PermissionHelper.openBatteryOptimizationSettings(requireContext())
+                }
+            }
+            .setNeutralButton("Battery Optimization") { _, _ ->
+                com.jarvis.assistant.util.PermissionHelper.openBatteryOptimizationSettings(requireContext())
+            }
+            .setNegativeButton("Done", null)
+            .show()
     }
 
     override fun onDestroyView() {

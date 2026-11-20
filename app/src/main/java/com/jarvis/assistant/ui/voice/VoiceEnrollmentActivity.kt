@@ -33,9 +33,9 @@ class VoiceEnrollmentActivity : AppCompatActivity() {
     private val preferences by lazy { JarvisApp.instance.preferences }
 
     private val samplePrompts = listOf(
-        "\"Hey Jarvis, wake up\"",
-        "\"Jarvis, turn on the flashlight\"",
-        "\"Jarvis, what is the weather today?\""
+        "\"Hey Zara, wake up\"",
+        "\"Zara, turn on the flashlight\"",
+        "\"Zara, what is the weather today?\""
     )
 
     private val recordedVectors = mutableListOf<FloatArray>()

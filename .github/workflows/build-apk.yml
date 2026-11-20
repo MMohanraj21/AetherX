@@ -27,6 +27,42 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
+      - name: Generate App Launcher Icons from Master Logo
+        run: |
+          pip install Pillow
+          python3 -c "
+          import os
+          from PIL import Image
+
+          src = 'app/src/main/res/drawable/zara_master_logo.png'
+          if not os.path.exists(src):
+              print('Source logo not found!')
+              exit(0)
+
+          img = Image.open(src).convert('RGBA')
+
+          densities = {
+              'mipmap-mdpi': (48, 48, 108, 108),
+              'mipmap-hdpi': (72, 72, 162, 162),
+              'mipmap-xhdpi': (96, 96, 216, 216),
+              'mipmap-xxhdpi': (144, 144, 324, 324),
+              'mipmap-xxxhdpi': (192, 192, 432, 432),
+          }
+
+          for folder, (w, h, fw, fh) in densities.items():
+              target_dir = os.path.join('app/src/main/res', folder)
+              os.makedirs(target_dir, exist_ok=True)
+              
+              icon = img.resize((w, h), Image.Resampling.LANCZOS)
+              icon.save(os.path.join(target_dir, 'ic_launcher.png'), 'PNG')
+              icon.save(os.path.join(target_dir, 'ic_launcher_round.png'), 'PNG')
+              
+              fg = img.resize((fw, fh), Image.Resampling.LANCZOS)
+              fg.save(os.path.join(target_dir, 'ic_launcher_foreground.png'), 'PNG')
+
+          print('Launcher icons generated successfully across all densities!')
+          "
+
       - name: Build Debug & Release APKs
         run: |
           ./gradlew assembleDebug --stacktrace
@@ -54,27 +90,36 @@ jobs:
         if: github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v2.5.0
-          name: "Zara AI Assistant v2.5 — Smart Native Island & App-Independent Wake Word"
+          tag_name: v2.6.0
+          name: "Zara AI Assistant v2.6.0 — Permanent Wake Word & Smart Personal Organizer"
           body: |
-            ### Zara AI Assistant v2.5
+            ### Zara AI Assistant v2.6.0
             Architected, Designed & Developed exclusively by Mohanraj (@Hexvora777).
             Official Connections:
             - Telegram: https://t.me/Hexvora777
             - Instagram: https://instagram.com/Hexvora777
 
-            ### What's New in v2.5:
-            - **Smart Native Island Detection & Integration**:
-              - Automated OEM hardware, model, and firmware inspection (Vivo OriginOS, Oppo Aqua Dynamics, Honor MagicOS Smart Capsule).
-              - Native system punch-hole live activity integration for supported devices.
-              - **Strict Zero-Fake-Island Rule**: Completely disables simulated overlays and floating popups when native system island is unsupported.
-            - **App-Independent Background Wake Word ("Hey ZARA")**:
-              - Hands-free on-device offline wake word detection running via persistent foreground microphone service.
-              - Seamless activation across Android Home Screen, third-party apps (WhatsApp, Chrome, ChatGPT, YouTube), and Lock Screen.
-              - Zero audio streamed to cloud until wake word triggers. Immediate hands-free conversation launch.
-            - **Permanent Creator Identity Protocol**:
-              - 100% verified sole creator identity: Mohanraj (@Hexvora777).
-              - Complete eradication of legacy branding across notifications, layouts, and service dialogs.
+            ### What's New in v2.6.0:
+            - **Official ZARA AI Identity & Branding**:
+              - Brand new high-resolution glowing neon cyber logo.
+              - 100% complete eradication of legacy "Jarvis" naming across all UI screens, toasts, dialogs, overlays, and notifications.
+              - **Permanent Creator Recognition Protocol**: Unconditionally identifies Mohanraj (@Hexvora777) as the sole creator and developer in Tamil, English, Hindi, and all languages.
+            - **Default Digital Assistant Integration**:
+              - System-level Android VoiceInteractionService integration.
+              - Select Zara as your default Digital Assistant in Android Settings (long-press Home / swipe from corner launches Zara instantly).
+              - Dedicated 1-tap Assistant setup row in Settings.
+            - **Permanent Wake Word Persistence & Auto-Shutdown Fix**:
+              - Fixed background activation failure: Standby Vosk wake-word listening cleanly re-arms after speech turns.
+              - App-independent wake word: `isWakeWordEnabled` is persistent and never resets when opening app or switching screens.
+              - OEM Autostart & background power management guidance for Vivo, Xiaomi & Samsung.
+            - **Smart Personal Organizer & Utilities Core**:
+              - **Smart Alarm System**: Create, edit, delete, and relative-time alarms hands-free.
+              - **Smart Notes Engine**: Persistent Room database storage (`zara_notes`) with categories, auto-save, search, and voice readback.
+              - **Smart Reminders**: Exact time scheduling via `AlarmManager.setExactAndAllowWhileIdle` with high-priority heads-up notifications.
+              - **Timers & Stopwatch**: Hands-free countdown timers.
+              - **Smart Calendar**: Event scheduling via `CalendarContract`.
+              - **Tasks & To-Dos**: High/Medium/Low priority task tracking.
+              - **Daily Briefing**: Natural spoken daily overview in Tamil, English, and Tanglish.
           files: |
             artifacts/Zara-release.apk
             artifacts/Zara-debug.apk
