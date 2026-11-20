@@ -97,7 +97,7 @@ class JarvisConversationService : Service() {
         private const val INACTIVITY_TIMEOUT_MS = 30 * 60 * 1000L // 30 minutes before standby
         private const val STANDBY_COOLDOWN_MS = 2500L
 
-        @Volatile private var activeInstance: JarvisConversationService? = null
+        @Volatile var activeInstance: JarvisConversationService? = null
 
         private val _isSessionOn = MutableStateFlow(false)
         val isSessionOn: StateFlow<Boolean> = _isSessionOn.asStateFlow()

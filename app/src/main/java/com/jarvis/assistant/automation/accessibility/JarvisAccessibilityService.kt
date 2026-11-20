@@ -643,18 +643,6 @@ class JarvisAccessibilityService : AccessibilityService() {
         return null
     }
 
-    private fun findFirstEditableNode(node: AccessibilityNodeInfo): AccessibilityNodeInfo? {
-        if (isEditableNode(node)) {
-            return node
-        }
-        for (i in 0 until node.childCount) {
-            val child = node.getChild(i) ?: continue
-            val match = findFirstEditableNode(child)
-            if (match != null) return match
-        }
-        return null
-    }
-
     private fun findAndClickSendInTree(node: AccessibilityNodeInfo): Boolean {
         if (isVoiceOrMicNode(node)) return false
 
