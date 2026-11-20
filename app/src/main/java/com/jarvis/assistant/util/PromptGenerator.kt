@@ -380,7 +380,7 @@ Example 6: "Turn on Do Not Disturb"
        - IMMEDIATELY call `click_ui_element(target_name="Go back")` or `press_key(key="back")` to return to the main chats list!
      * Step 3 (MANDATORY DIRECT CLICK FIRST):
        - Check `Visible Elements` in `current_screen_elements` or from `inspect_screen()`.
-       - If the requested chat, channel, contact, folder, or item (e.g., "Bharat", "TechGpt X", "Dad", "Gyms", etc.) is listed in `Visible Elements`:
+       - If the requested chat, channel, contact, folder, or item (e.g., "Bharat", "Mohanraj", "Dad", "Gyms", etc.) is listed in `Visible Elements`:
        - **YOU MUST DIRECTLY CLICK IT WITH `click_ui_element(target_name=...)`!**
        - **STRICT PROHIBITION: DO NOT CALL `type_text`! DO NOT TOUCH SEARCH! DO NOT CLICK THE SEARCH ICON IF THE TARGET ITEM IS ALREADY VISIBLE ON SCREEN!** Always click the visible item directly!
      * Step 4 (Search is STRICTLY a Fallback):

@@ -28,11 +28,12 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
 /**
- * Controller singleton managing ZARA AI's Origin Island overlay.
- * Handles:
- * - Dynamic punch-hole positioning across Vivo OriginOS, Funtouch OS, and standard Android.
- * - WindowManager overlay lifecycle with TYPE_APPLICATION_OVERLAY.
- * - Reactive state synchronization with ZARA AI conversation engine, media session, and notifications.
+ * Controller singleton managing ZARA AI's Island integration.
+ *
+ * Strict Architectural Rule:
+ * - Genuine native system Island is used ONLY when [NativeIslandDetector.isNativeIslandSupported] is true.
+ * - On unsupported devices, all floating overlays and fake simulated islands are strictly DISABLED.
+ * - No fake Island, no floating popups, no unnecessary overlays.
  */
 class ZaraIslandManager private constructor(private val appContext: Context) {
 
@@ -52,6 +53,7 @@ class ZaraIslandManager private constructor(private val appContext: Context) {
     private val windowManager = appContext.getSystemService(Context.WINDOW_SERVICE) as WindowManager
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private val mainHandler = Handler(Looper.getMainLooper())
+    private val nativeBridge = NativeIslandBridge.getInstance(appContext)
 
     private var overlayView: ZaraIslandOverlayView? = null
     private var windowParams: WindowManager.LayoutParams? = null
@@ -62,6 +64,10 @@ class ZaraIslandManager private constructor(private val appContext: Context) {
 
     init {
         observeConversationService()
+    }
+
+    fun isNativeSupported(): Boolean {
+        return NativeIslandDetector.isNativeIslandSupported(appContext)
     }
 
     fun hasOverlayPermission(): Boolean {
@@ -79,70 +85,35 @@ class ZaraIslandManager private constructor(private val appContext: Context) {
     }
 
     /**
-     * Attaches or updates the Floating Island in the Android WindowManager.
+     * Attaches or updates Island integration.
+     *
+     * In accordance with requirements:
+     * - If native system Island is supported, bridges to native Live Activity.
+     * - If unsupported, fake floating overlay is STRICTLY DISABLED.
      */
     @SuppressLint("WrongConstant")
     fun showIsland(): Boolean {
+        // Enforce: Never create a fake floating island as a replacement
+        if (!isNativeSupported()) {
+            Log.i(TAG, "Device does not support genuine native Island. Fake overlay simulation strictly disabled.")
+            hideIsland()
+            return false
+        }
+
         val prefs = (appContext as? JarvisApp)?.preferences
         if (prefs != null && !prefs.isIslandEnabled) {
             hideIsland()
             return false
         }
 
-        if (!hasOverlayPermission()) {
-            Log.w(TAG, "showIsland: Overlay permission not granted; floating island cannot attach to window")
-            return false
-        }
-
-        if (isOverlayAttached && overlayView != null) {
-            overlayView?.visibility = View.VISIBLE
-            return true
-        }
-
-        try {
-            val view = ZaraIslandOverlayView(appContext).apply {
-                setupOverlayCallbacks(this)
-            }
-            overlayView = view
-
-            val statusBarOffset = calculateStatusBarOffset()
-
-            val params = WindowManager.LayoutParams(
-                WindowManager.LayoutParams.WRAP_CONTENT,
-                WindowManager.LayoutParams.WRAP_CONTENT,
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
-                } else {
-                    @Suppress("DEPRECATION")
-                    WindowManager.LayoutParams.TYPE_PHONE
-                },
-                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                        WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
-                        WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
-                PixelFormat.TRANSLUCENT
-            ).apply {
-                gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
-                x = 0
-                y = statusBarOffset
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                    layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
-                }
-            }
-            windowParams = params
-
-            windowManager.addView(view, params)
-            isOverlayAttached = true
-            Log.i(TAG, "Origin Island attached to WindowManager successfully (y-offset=$statusBarOffset)")
-            return true
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to attach Origin Island overlay: ${e.message}", e)
-            isOverlayAttached = false
-            overlayView = null
-            return false
-        }
+        // Bridge to native system island
+        val currentState = JarvisConversationService.conversationState.value
+        nativeBridge.updateState(currentState)
+        return true
     }
 
     fun hideIsland() {
+        nativeBridge.dismiss()
         if (!isOverlayAttached || overlayView == null) return
         try {
             overlayView?.stopFrameTicker()
@@ -159,7 +130,6 @@ class ZaraIslandManager private constructor(private val appContext: Context) {
         view.onIslandClickListener = {
             val isSessionOn = JarvisConversationService.isSessionOn.value
             if (!isSessionOn) {
-                // Activate voice session immediately
                 val intent = Intent(appContext, JarvisConversationService::class.java).apply {
                     action = JarvisConversationService.ACTION_START_CONVERSATION
                 }
@@ -195,7 +165,7 @@ class ZaraIslandManager private constructor(private val appContext: Context) {
             skipActiveMediaNext()
         }
 
-        view.onNotificationClickListener = { id ->
+        view.onNotificationClickListener = { _ ->
             launchMainActivity()
         }
     }
@@ -205,21 +175,6 @@ class ZaraIslandManager private constructor(private val appContext: Context) {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
         }
         appContext.startActivity(intent)
-    }
-
-    /**
-     * Calculates optimal Y offset around the camera punch-hole.
-     * Takes Vivo OriginOS / Funtouch OS cutout dimensions and status bar height into account.
-     */
-    private fun calculateStatusBarOffset(): Int {
-        var result = (10 * appContext.resources.displayMetrics.density).toInt()
-        val resourceId = appContext.resources.getIdentifier("status_bar_height", "dimen", "android")
-        if (resourceId > 0) {
-            val sbHeight = appContext.resources.getDimensionPixelSize(resourceId)
-            // Center the island with the status bar punch-hole area
-            result = maxOf((6 * appContext.resources.displayMetrics.density).toInt(), sbHeight / 3)
-        }
-        return result
     }
 
     /**
@@ -246,14 +201,19 @@ class ZaraIslandManager private constructor(private val appContext: Context) {
 
         scope.launch {
             JarvisConversationService.isSessionOn.collectLatest { sessionOn ->
-                if (sessionOn) {
+                if (sessionOn && isNativeSupported()) {
                     showIsland()
+                } else if (!sessionOn && isNativeSupported()) {
+                    nativeBridge.updateState(ConversationState.IDLE)
                 }
             }
         }
     }
 
     private fun handleConversationStateChanged(state: ConversationState) {
+        if (isNativeSupported()) {
+            nativeBridge.updateState(state)
+        }
         val view = overlayView ?: return
         when (state) {
             ConversationState.IDLE -> view.setMode(IslandMode.IDLE)

@@ -54,18 +54,27 @@ jobs:
         if: github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v2.4.0
-          name: "Zara AI Assistant v2.4 — Origin Island & Universal Typing (By Mohanraj)"
+          tag_name: v2.5.0
+          name: "Zara AI Assistant v2.5 — Smart Native Island & App-Independent Wake Word"
           body: |
-            ### Zara AI Assistant v2.4
+            ### Zara AI Assistant v2.5
             Architected, Designed & Developed exclusively by Mohanraj (@Hexvora777).
-            Telegram: https://t.me/Hexvora777
-            Instagram: https://instagram.com/Hexvora777
+            Official Connections:
+            - Telegram: https://t.me/Hexvora777
+            - Instagram: https://instagram.com/Hexvora777
 
-            ### What's New in v2.4:
-            - **Origin Island Integration**: Apple Dynamic Island & Vivo Origin Island inspired floating pill interface with real-time waveform, thinking orbit, media controls, and notification cards.
-            - **Universal Typing with Gboard**: Dictate text directly into focused fields across WhatsApp, ChatGPT, Chrome, Instagram, Telegram, Gmail, and Google Docs while keeping Gboard untouched.
-            - **Interruptible Voice & Barge-In**: Real-time voice interruption over loudspeaker and headphones with immediate task and TTS cancellation.
+            ### What's New in v2.5:
+            - **Smart Native Island Detection & Integration**:
+              - Automated OEM hardware, model, and firmware inspection (Vivo OriginOS, Oppo Aqua Dynamics, Honor MagicOS Smart Capsule).
+              - Native system punch-hole live activity integration for supported devices.
+              - **Strict Zero-Fake-Island Rule**: Completely disables simulated overlays and floating popups when native system island is unsupported.
+            - **App-Independent Background Wake Word ("Hey ZARA")**:
+              - Hands-free on-device offline wake word detection running via persistent foreground microphone service.
+              - Seamless activation across Android Home Screen, third-party apps (WhatsApp, Chrome, ChatGPT, YouTube), and Lock Screen.
+              - Zero audio streamed to cloud until wake word triggers. Immediate hands-free conversation launch.
+            - **Permanent Creator Identity Protocol**:
+              - 100% verified sole creator identity: Mohanraj (@Hexvora777).
+              - Complete eradication of legacy branding across notifications, layouts, and service dialogs.
           files: |
             artifacts/Zara-release.apk
             artifacts/Zara-debug.apk

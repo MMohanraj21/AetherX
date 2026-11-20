@@ -557,7 +557,7 @@ class JarvisConversationService : Service() {
                         !PermissionHelper.hasNotificationPermission(this@JarvisConversationService))) {
                     Log.w("JarvisService", "A required runtime permission was revoked during the live session; stopping the session")
                     stopActiveConversation()
-                    serviceScope.launch { _events.emit("Jarvis paused because a required permission was turned off. Re-enable it in System Permissions to continue.") }
+                    serviceScope.launch { _events.emit("Zara paused because a required permission was turned off. Re-enable it in System Permissions to continue.") }
                 }
                 if (com.jarvis.assistant.automation.agent.AgentTaskEngine.current() != null &&
                     !PermissionHelper.isAccessibilityServiceEnabled(this@JarvisConversationService)) {
@@ -761,7 +761,7 @@ class JarvisConversationService : Service() {
         if (apiKey.isBlank()) {
             _liveError.value = JarvisLiveError(
                 title = "API KEY MISSING",
-                message = "No Gemini API Key configured. Please enter your API Key in Settings to activate Jarvis.",
+                message = "No Gemini API Key configured. Please enter your API Key in Settings to activate Zara.",
                 errorCode = "API_KEY_MISSING",
                 actionText = "OPEN SETTINGS"
             )
@@ -773,11 +773,11 @@ class JarvisConversationService : Service() {
         if (!PermissionHelper.hasAllRequiredPermissions(this)) {
             _liveError.value = JarvisLiveError(
                 title = "PERMISSIONS REQUIRED",
-                message = "Jarvis requires Microphone and Notification permissions to run. Please grant them in Authorizations.",
+                message = "Zara requires Microphone and Notification permissions to run. Please grant them in Authorizations.",
                 errorCode = "PERMISSIONS_MISSING",
                 actionText = "GRANT PERMISSIONS"
             )
-            serviceScope.launch { _events.emit("Please allow all required permissions in Settings to use Jarvis.") }
+            serviceScope.launch { _events.emit("Please allow all required permissions in Settings to use Zara.") }
             fullStop()
             return
         }
@@ -1303,7 +1303,7 @@ class JarvisConversationService : Service() {
                                 "API_KEY_MISSING" -> {
                                     _liveError.value = JarvisLiveError(
                                         title = "API KEY MISSING",
-                                        message = "No Gemini API key found. Enter your BYOK key in Settings to activate Jarvis.",
+                                        message = "No Gemini API key found. Enter your BYOK key in Settings to activate Zara.",
                                         errorCode = "API_KEY_MISSING",
                                         actionText = "OPEN SETTINGS"
                                     )
@@ -1577,7 +1577,7 @@ class JarvisConversationService : Service() {
                                             setConversationState(ConversationState.IDLE)
                                             lastResponseTimedOut = true
                                             updateNotification()
-                                            serviceScope.launch { _events.emit("Jarvis did not receive a reply. Check the connection and repeat your request.") }
+                                            serviceScope.launch { _events.emit("Zara did not receive a reply. Check the connection and repeat your request.") }
                                         }
                                     }
                                 }
@@ -3000,8 +3000,8 @@ class JarvisConversationService : Service() {
 
         try {
             standbyActivatedTime = System.currentTimeMillis()
-            // Phrase grammar: allow single-word "jarvis", multi-syllable wake phrases, and [unk]
-            val grammar = "[\"jarvis\", \"hey jarvis\", \"hi jarvis\", \"hello jarvis\", \"ok jarvis\", \"okay jarvis\", \"wake up jarvis\", \"sun jarvis\", \"suno jarvis\", \"jarvis jarvis\", \"[unk]\"]"
+            // Phrase grammar: allow single-word "zara", multi-syllable wake phrases, phonetic matches, and [unk]
+            val grammar = "["zara", "hey zara", "hi zara", "hello zara", "ok zara", "okay zara", "wake up zara", "listen zara", "sara", "hey sara", "hi sara", "hello sara", "ok sara", "okay sara", "wake up sara", "xara", "hey xara", "zahra", "hey zahra", "[unk]"]"
             val rec = Recognizer(model, 16000.0f, grammar)
             rec.setWords(true)
             val spkModel = VoskModelManager.speakerModel
@@ -3057,16 +3057,9 @@ class JarvisConversationService : Service() {
     }
 
     private val VALID_WAKE_PHRASES = setOf(
-        "jarvis",
-        "hey jarvis",
-        "hi jarvis",
-        "hello jarvis",
-        "ok jarvis",
-        "okay jarvis",
-        "wake up jarvis",
-        "sun jarvis",
-        "suno jarvis",
-        "jarvis jarvis"
+        "zara", "hey zara", "hi zara", "hello zara", "ok zara", "okay zara", "wake up zara", "listen zara",
+        "sara", "hey sara", "hi sara", "hello sara", "ok sara", "okay sara", "wake up sara",
+        "xara", "hey xara", "zahra", "hey zahra"
     )
 
     private fun checkVoskHypothesis(hypothesisJson: String?) {
@@ -3109,12 +3102,14 @@ class JarvisConversationService : Service() {
             if (wordList.isEmpty()) return
 
             val cleanPhrase = wordList.joinToString(" ")
+            val targetKeywords = setOf("zara", "sara", "zahra", "xara")
+            val containsTargetKeyword = wordList.any { it in targetKeywords }
             val isMatch = cleanPhrase in VALID_WAKE_PHRASES ||
                     VALID_WAKE_PHRASES.any { cleanPhrase.contains(it) } ||
-                    wordList.contains("jarvis")
+                    containsTargetKeyword
 
             if (!isMatch) {
-                Log.d("JarvisService", "WAKE REJECTED: '$cleanPhrase' is not an exact valid wake phrase.")
+                Log.d("JarvisService", "WAKE REJECTED: '$cleanPhrase' is not a valid Zara wake phrase.")
                 return
             }
 
@@ -3125,25 +3120,19 @@ class JarvisConversationService : Service() {
 
             Log.i("JarvisService", "Vosk candidate hypothesis: '$cleanPhrase' (words=$wordList, avgConf=$avgConf, duration=${duration}s)")
 
-            // 4. Acoustic Verification:
-            // 4. Acoustic Verification:
-            // "jarvis" must be specifically recognized with confidence
-            val jarvisConf = wordConfMap["jarvis"] ?: 0.0
-            if (jarvisConf < 0.70) {
-                Log.w("JarvisService", "WAKE REJECTED: 'jarvis' word confidence too low ($jarvisConf < 0.70). Ignored.")
-                return
-            }
+            // 4. Acoustic Verification for Zara:
+            val targetConf = wordConfMap.filterKeys { it in targetKeywords }.values.maxOrNull() ?: 0.0
 
-            if (wordList.size == 1 && wordList[0] == "jarvis") {
-                // Standalone single-word "jarvis"
-                if (avgConf < 0.75) {
-                    Log.w("JarvisService", "WAKE REJECTED: Standalone 'jarvis' failed checks (conf=$avgConf). Ignored.")
+            if (wordList.size == 1 && wordList[0] in targetKeywords) {
+                // Standalone single-word "zara" / "sara"
+                if (targetConf < 0.60 || avgConf < 0.60) {
+                    Log.w("JarvisService", "WAKE REJECTED: Standalone '$cleanPhrase' failed checks (conf=$targetConf). Ignored.")
                     return
                 }
             } else {
-                // Multi-word phrases like "hey jarvis", "hello jarvis", "ok jarvis"
-                if (avgConf < 0.65) {
-                    Log.w("JarvisService", "WAKE REJECTED: Wake phrase failed checks (conf=$avgConf). Ignored.")
+                // Multi-word phrases like "hey zara", "hello zara", "ok zara"
+                if (avgConf < 0.55 && targetConf < 0.55) {
+                    Log.w("JarvisService", "WAKE REJECTED: Wake phrase failed checks (avgConf=$avgConf, targetConf=$targetConf). Ignored.")
                     return
                 }
             }
@@ -3226,7 +3215,88 @@ class JarvisConversationService : Service() {
         hasSpeechInCurrentUtterance = false
         hasSignalledUtteranceEnd = false
         serviceScope.launch { _wakeEvents.emit(Unit) }
+
+        // Launch ZARA conversation interface seamlessly from background / lock screen
+        launchAssistantUiFromBackground()
+
+        // Open microphone immediately on foreground service so command is heard without delay
         beginActiveConversation(wakeTriggered = true)
+    }
+
+    private fun launchAssistantUiFromBackground() {
+        try {
+            acquireWakeLock()
+            val activityIntent = Intent(this, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or
+                        Intent.FLAG_ACTIVITY_SINGLE_TOP or
+                        Intent.FLAG_ACTIVITY_CLEAR_TOP
+                putExtra("EXTRA_VOICE_TRIGGER", true)
+                putExtra("EXTRA_WAKE_WORD_ACTIVATED", true)
+            }
+
+            // Direct Activity Launch (works when SYSTEM_ALERT_WINDOW granted or foreground)
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                    val options = android.app.ActivityOptions.makeBasic().apply {
+                        pendingIntentBackgroundActivityStartMode = android.app.ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOWED
+                    }
+                    startActivity(activityIntent, options.toBundle())
+                } else {
+                    startActivity(activityIntent)
+                }
+                Log.i("JarvisService", "Direct startActivity launched for Zara wake word")
+            } catch (e: Exception) {
+                Log.w("JarvisService", "Direct background startActivity restricted: ${e.message}")
+            }
+
+            // High-priority fullScreenIntent Heads-Up alert (works over WhatsApp, Chrome, Home Screen & Lock Screen)
+            postWakeHeadsUpAlert(activityIntent)
+        } catch (e: Exception) {
+            Log.e("JarvisService", "Error launching assistant UI from background: ${e.message}", e)
+        }
+    }
+
+    private fun postWakeHeadsUpAlert(activityIntent: Intent) {
+        try {
+            val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager ?: return
+            val channelId = "zara_wake_alert"
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                val channel = NotificationChannel(
+                    channelId,
+                    "Zara Wake Activation",
+                    NotificationManager.IMPORTANCE_HIGH
+                ).apply {
+                    description = "Instant voice activation alert for Zara AI"
+                    setSound(null, null)
+                    enableVibration(false)
+                    lockscreenVisibility = android.app.Notification.VISIBILITY_PUBLIC
+                }
+                notificationManager.createNotificationChannel(channel)
+            }
+
+            val fullScreenPendingIntent = PendingIntent.getActivity(
+                this,
+                9999,
+                activityIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+
+            val wakeAlert = NotificationCompat.Builder(this, channelId)
+                .setSmallIcon(android.R.drawable.ic_btn_speak_now)
+                .setContentTitle("Zara AI")
+                .setContentText("Listening… Speak your command")
+                .setPriority(NotificationCompat.PRIORITY_MAX)
+                .setCategory(NotificationCompat.CATEGORY_CALL)
+                .setFullScreenIntent(fullScreenPendingIntent, true)
+                .setContentIntent(fullScreenPendingIntent)
+                .setAutoCancel(true)
+                .setTimeoutAfter(6000L)
+                .build()
+
+            notificationManager.notify(9999, wakeAlert)
+        } catch (e: Exception) {
+            Log.w("JarvisService", "Failed to post wake heads-up alert: ${e.message}")
+        }
     }
 
     private fun vibrateBriefly() {
@@ -3319,7 +3389,7 @@ class JarvisConversationService : Service() {
             "go to background", "go background", "go in background", "go in the background",
             "background me jao", "background mein jao", "send to background", "move to background",
             "minimize", "go home", "go to home", "go to home screen",
-            "go to sleep", "sleep jarvis", "enter standby", "standby mode", "go to standby",
+            "go to sleep", "sleep zara", "enter standby", "standby mode", "go to standby",
             "take a break", "so jao"
         )
         return patterns.any { containsPhrase(clean, it) }
@@ -3344,7 +3414,7 @@ class JarvisConversationService : Service() {
         if (movedBack) {
             Log.i("JarvisService", "JARVIS foreground activity moved to back safely")
         } else {
-            Log.i("JarvisService", "JARVIS going to background standby; leaving active foreground app intact")
+            Log.i("JarvisService", "ZARA going to background standby; leaving active foreground app intact")
         }
     }
 
@@ -3386,20 +3456,20 @@ class JarvisConversationService : Service() {
 
     private fun buildNotification(): android.app.Notification {
         val (title, text) = when {
-            _isStandby.value -> "Jarvis is in the background" to "Say \"Hey Jarvis\" to wake me up"
+            _isStandby.value -> "Zara is in the background" to "Say \"Hey Zara\" to wake me up"
             _isSessionOn.value && !_connectionStatus.value.equals("LIVE", ignoreCase = true) ->
-                "Jarvis is reconnecting" to "Connection: ${_connectionStatus.value}. Requests may not be heard yet."
+                "Zara is reconnecting" to "Connection: ${_connectionStatus.value}. Requests may not be heard yet."
             _isSessionOn.value && lastResponseTimedOut ->
-                "Jarvis did not reply" to "Connection is active. Repeat your request."
+                "Zara did not reply" to "Connection is active. Repeat your request."
             _isSessionOn.value && _conversationState.value == ConversationState.SPEAKING ->
-                "Jarvis is replying" to "Audio response is playing"
+                "Zara is replying" to "Audio response is playing"
             _isSessionOn.value && _conversationState.value == ConversationState.THINKING ->
-                "Jarvis is thinking" to "Processing your request"
+                "Zara is thinking" to "Processing your request"
             _isSessionOn.value && _conversationState.value == ConversationState.LISTENING ->
-                "Jarvis is listening" to "Speak your request now"
+                "Zara is listening" to "Speak your request now"
             _isSessionOn.value ->
-                "Jarvis is ready" to "Connected. Say your request or \"Hey Jarvis\"."
-            else -> "Jarvis" to "Starting up\u2026"
+                "Zara is ready" to "Connected. Say your request or \"Hey Zara\"."
+            else -> "Zara" to "Starting up\u2026"
         }
         val contentIntent = PendingIntent.getActivity(
             this, 0, Intent(this, MainActivity::class.java),

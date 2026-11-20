@@ -220,12 +220,31 @@ class MainActivity : AppCompatActivity() {
         outState.putInt("CURRENT_TAB", currentTab)
     }
 
+    override fun onNewIntent(intent: Intent?) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        if (intent?.getBooleanExtra("EXTRA_VOICE_TRIGGER", false) == true ||
+            intent?.getBooleanExtra("EXTRA_WAKE_WORD_ACTIVATED", false) == true
+        ) {
+            selectTab(TAB_HOME)
+        }
+    }
+
     override fun onResume() {
         super.onResume()
         viewModel.refreshSettings()
         val prefs = com.jarvis.assistant.JarvisApp.instance.preferences
-        if (prefs.isIslandEnabled && com.jarvis.assistant.island.ZaraIslandManager.getInstance(this).hasOverlayPermission()) {
-            com.jarvis.assistant.island.ZaraIslandManager.getInstance(this).showIsland()
+        // Only integrate Island if natively supported by the device hardware/firmware
+        val islandManager = com.jarvis.assistant.island.ZaraIslandManager.getInstance(this)
+        if (prefs.isIslandEnabled && islandManager.isNativeSupported()) {
+            islandManager.showIsland()
+        }
+        // Ensure background wake-word listening service is active in standby
+        if (PermissionHelper.hasRecordAudioPermission(this) && PermissionHelper.hasNotificationPermission(this)) {
+            val serviceIntent = Intent(this, JarvisConversationService::class.java).apply {
+                action = JarvisConversationService.ACTION_ENTER_STANDBY
+            }
+            androidx.core.content.ContextCompat.startForegroundService(this, serviceIntent)
         }
         if (appliedThemeKey != prefs.appTheme || appliedCustomHex != prefs.customThemeColor) {
             appliedThemeKey = prefs.appTheme

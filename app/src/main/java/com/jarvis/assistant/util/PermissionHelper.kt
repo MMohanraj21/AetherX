@@ -101,6 +101,33 @@ object PermissionHelper {
         }
     }
 
+
+    fun openOemAutostartSettings(context: Context) {
+        val intents = listOf(
+            // Vivo / iQOO
+            Intent().setComponent(android.content.ComponentName("com.iqoo.secure", "com.iqoo.secure.ui.phoneoptimize.AddWhiteListActivity")),
+            Intent().setComponent(android.content.ComponentName("com.vivo.permissionmanager", "com.vivo.permissionmanager.activity.BgStartUpManagerActivity")),
+            Intent().setComponent(android.content.ComponentName("com.iqoo.secure", "com.iqoo.secure.MainGuideActivity")),
+            // Xiaomi / MIUI / HyperOS
+            Intent().setComponent(android.content.ComponentName("com.miui.securitycenter", "com.miui.permcenter.autostart.AutoStartManagementActivity")),
+            // Oppo / ColorOS
+            Intent().setComponent(android.content.ComponentName("com.coloros.safecenter", "com.coloros.safecenter.permission.startup.StartupAppListActivity")),
+            Intent().setComponent(android.content.ComponentName("com.coloros.safecenter", "com.coloros.safecenter.startupapp.StartupAppListActivity")),
+            // Huawei / Honor
+            Intent().setComponent(android.content.ComponentName("com.huawei.systemmanager", "com.huawei.systemmanager.startupmgr.ui.StartupNormalAppListActivity")),
+            Intent().setComponent(android.content.ComponentName("com.huawei.systemmanager", "com.huawei.systemmanager.optimize.process.ProtectActivity"))
+        )
+        for (intent in intents) {
+            try {
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                context.startActivity(intent)
+                return
+            } catch (_: Exception) {}
+        }
+        // Fallback: standard battery optimization
+        requestBatteryOptimization(context)
+    }
+
     fun hasAllRequiredPermissions(context: Context): Boolean {
         return hasRecordAudioPermission(context) &&
                hasNotificationPermission(context) &&
