@@ -41,7 +41,7 @@ object CommandParser {
 
     fun parse(input: String, isAwaitingConfirmation: Boolean = false, isAwaitingDisambiguation: Boolean = false): ParsedCommandResult {
         val clean = input
-            .replace(Regex("(?i)^(hey jarvis|hi jarvis|hello jarvis|ok jarvis|jarvis|service)[,\\s]*"), "")
+            .replace(Regex("(?i)^(hey zara|hi zara|hello zara|ok zara|zara|hey jarvis|hi jarvis|hello jarvis|ok jarvis|jarvis|service)[,\\s]*"), "")
             .replace(Regex("[.,!?:;\"'\\s]+$"), "")
             .trim()
             .lowercase(Locale.ROOT)

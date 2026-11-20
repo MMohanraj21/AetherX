@@ -508,7 +508,7 @@ class JarvisConversationService : Service() {
                 val shown = taskProgressOverlay?.update(snapshot, showIdleAvatar) == true
                 if (snapshot != null && !shown && overlayPermissionWarningTaskId != snapshot.taskId) {
                     overlayPermissionWarningTaskId = snapshot.taskId
-                    _events.emit("Task progress is shown inside JARVIS Home. Allow Display over other apps if you want the floating task panel over Instagram, Spotify, and Chrome.")
+                    _events.emit("Task progress is shown inside Zara Home. Allow Display over other apps if you want the floating task panel over Instagram, Spotify, and Chrome.")
                 }
             }
         }
@@ -2016,7 +2016,7 @@ class JarvisConversationService : Service() {
                             is com.jarvis.assistant.util.ContactCaller.CallResult.Success -> Pair(true, "Calling ${callResult.contact.name}.")
                             is com.jarvis.assistant.util.ContactCaller.CallResult.NoMatch -> Pair(false, "Could not find contact $contact.")
                             is com.jarvis.assistant.util.ContactCaller.CallResult.MultipleMatches -> Pair(false, "Multiple contacts found for $contact.")
-                            is com.jarvis.assistant.util.ContactCaller.CallResult.MissingContactsPermission -> Pair(false, "Contacts permission is not granted, so JARVIS cannot look up that saved contact.")
+                            is com.jarvis.assistant.util.ContactCaller.CallResult.MissingContactsPermission -> Pair(false, "Contacts permission is not granted, so Zara cannot look up that saved contact.")
                             is com.jarvis.assistant.util.ContactCaller.CallResult.MissingCallPermission -> Pair(false, "Phone call permission is not granted.")
                             is com.jarvis.assistant.util.ContactCaller.CallResult.CallFailed -> Pair(false, "Could not place phone call.")
                         }
@@ -2070,7 +2070,7 @@ class JarvisConversationService : Service() {
                             minimizeToHomeScreen()
                             enterStandby(announce = false)
                             result.put("success", true)
-                            result.put("message", "Sent JARVIS to background standby mode.")
+                            result.put("message", "Sent Zara to background standby mode.")
                         }
                     }
 
@@ -3349,7 +3349,7 @@ class JarvisConversationService : Service() {
 
     private fun createChannel() {
         (getSystemService(NOTIFICATION_SERVICE) as NotificationManager).createNotificationChannel(
-            NotificationChannel(CHANNEL_ID, "Jarvis", NotificationManager.IMPORTANCE_LOW)
+            NotificationChannel(CHANNEL_ID, "Zara", NotificationManager.IMPORTANCE_LOW)
         )
     }
 

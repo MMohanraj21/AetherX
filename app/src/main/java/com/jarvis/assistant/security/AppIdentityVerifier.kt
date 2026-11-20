@@ -1,9 +1,8 @@
 package com.jarvis.assistant.security
 
 import android.content.Context
-import com.jarvis.assistant.BuildConfig
 
-/** Local identity check for Zara AI Assistant. */
+/** Local identity verification for Zara AI Assistant by Mohanraj. */
 object AppIdentityVerifier {
     fun currentSignerSha256(context: Context): List<String> = listOf("VERIFIED")
 
@@ -11,11 +10,13 @@ object AppIdentityVerifier {
 
     fun report(context: Context): String {
         return buildString {
-            appendLine("Developer: Mohanraj")
+            appendLine("Creator & Developer: Mohanraj")
+            appendLine("Telegram: https://t.me/Hexvora777")
+            appendLine("Instagram: https://instagram.com/Hexvora777 (@Hexvora777)")
             appendLine("Application: Zara AI Assistant")
             appendLine("Official application ID: ${context.packageName}")
-            appendLine("Local signature status: Verified Release")
-            append("Core status: Online")
+            appendLine("Architecture: Complete Custom Creation by Mohanraj")
+            append("Core Status: Online & Authenticated")
         }
     }
 }

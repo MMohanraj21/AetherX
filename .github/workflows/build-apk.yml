@@ -54,11 +54,13 @@ jobs:
         if: github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v2.1.0
-          name: "Zara AI Assistant — Official Release"
+          tag_name: v2.2.0
+          name: "Zara AI Assistant v2.2 — Official Release (By Mohanraj)"
           body: |
             ### Zara AI Assistant
-            Developed by Mohanraj.
+            Architected, Designed & Developed exclusively by Mohanraj (@Hexvora777).
+            Telegram: https://t.me/Hexvora777
+            Instagram: https://instagram.com/Hexvora777
             - Full Three.js 3D Quantum Arc Reactor HUD
             - Bidirectional Gemini Live WebSocket Voice Streaming
             - Offline Vosk Voice Recognition Core

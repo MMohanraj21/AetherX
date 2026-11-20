@@ -192,19 +192,20 @@ class SettingsFragment : Fragment() {
 
         // Social Media Community Buttons
         binding.btnSocialTelegram.setOnClickListener {
-            openUrl("https://t.me/+sYana61LvHdmZmE1")
+            openUrl("https://t.me/Hexvora777")
         }
 
         binding.btnSocialInstagram.setOnClickListener {
-            openUrl("https://www.instagram.com/techgptx.ai")
+            openUrl("https://instagram.com/Hexvora777")
         }
 
         binding.btnSocialYoutube.setOnClickListener {
-            openUrl("https://youtube.com/@TechGptX")
+            openUrl("https://t.me/Hexvora777")
         }
 
+        binding.tvFooterCredit.text = "ZARA AI OS • v2.2 PRO\nArchitected & Developed exclusively by Mohanraj\nTelegram: t.me/Hexvora777 • Instagram: @Hexvora777"
         binding.tvFooterCredit.setOnClickListener {
-            openUrl("https://t.me/+sYana61LvHdmZmE1")
+            openUrl("https://t.me/Hexvora777")
         }
     }
 
