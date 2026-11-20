@@ -77,7 +77,22 @@ class AppPreferences(context: Context) {
         private const val KEY_ORB_SCALE = "key_orb_scale"
         private const val KEY_ORB_HUE = "key_orb_hue"
         private const val KEY_CUSTOM_ENDPOINT = "key_custom_endpoint"
+        private const val KEY_ISLAND_ENABLED = "key_island_enabled"
+        private const val KEY_ISLAND_MUSIC_ENABLED = "key_island_music_enabled"
+        private const val KEY_ISLAND_NOTIFICATIONS_ENABLED = "key_island_notifications_enabled"
     }
+
+    var isIslandEnabled: Boolean
+        get() = prefs.getBoolean(KEY_ISLAND_ENABLED, true)
+        set(value) = prefs.edit().putBoolean(KEY_ISLAND_ENABLED, value).apply()
+
+    var isIslandMusicEnabled: Boolean
+        get() = prefs.getBoolean(KEY_ISLAND_MUSIC_ENABLED, true)
+        set(value) = prefs.edit().putBoolean(KEY_ISLAND_MUSIC_ENABLED, value).apply()
+
+    var isIslandNotificationsEnabled: Boolean
+        get() = prefs.getBoolean(KEY_ISLAND_NOTIFICATIONS_ENABLED, true)
+        set(value) = prefs.edit().putBoolean(KEY_ISLAND_NOTIFICATIONS_ENABLED, value).apply()
 
     var isOwnerVoiceEnabled: Boolean
         get() = prefs.getBoolean(KEY_OWNER_VOICE_ENABLED, false)

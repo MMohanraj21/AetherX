@@ -98,6 +98,16 @@ object CommandParser {
             return ParsedCommandResult(JarvisCommand.ToggleFullscreen, 0.97f, "YOUTUBE_FULLSCREEN")
         }
 
+        // 3d. Universal Typing & Voice Dictation into focused text field
+        val typePattern = Regex("$prefix(?:type|dictate|write|type\\s+message|type\\s+text|type\\s+this|type\\s+pannu|eluthu|solrathu\\s+type\\s+pannu|type\\s+karo|likho|likh\\s+do)\\s+(.+)")
+        val typeMatch = typePattern.find(clean)
+        if (typeMatch != null) {
+            val dictatedText = typeMatch.groupValues[1].trim()
+            if (dictatedText.isNotBlank()) {
+                return ParsedCommandResult(JarvisCommand.TypeText(dictatedText, append = true), 0.98f, "UNIVERSAL_TYPE")
+            }
+        }
+
         // 4. Brightness Controls (Strict Anchoring)
         val levelWords = "(\\d{1,3}|zero|mute|min|minimum|lowest|silence|nil|off|ten|twenty|twenty five|quarter|thirty|forty|fifty|half|sixty|seventy|seventy five|eighty|ninety|hundred|full|max|maximum|highest)"
         val brightnessPattern = Regex("$prefix(?:set|make|turn|put|bring)?\\s*(?:the\\s+)?(?:screen\\s+)?brightness\\s*(?:to|at|is|=)?\\s*$levelWords\\s*%?$")

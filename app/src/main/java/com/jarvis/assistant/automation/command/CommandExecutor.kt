@@ -77,6 +77,19 @@ class CommandExecutor(
             is JarvisCommand.RecallFavoriteSong -> memoryManager.getFavoriteSongResponse()
             is JarvisCommand.RecallRoutine -> memoryManager.getRoutineResponse()
             is JarvisCommand.GoToBackground -> "Going to background."
+            is JarvisCommand.TypeText -> {
+                val service = com.jarvis.assistant.automation.accessibility.JarvisAccessibilityService.instance
+                if (service != null) {
+                    val success = service.typeDictatedText(command.text, command.append)
+                    if (success) {
+                        "Typed: ${command.text}"
+                    } else {
+                        "I couldn't find an active text field. Please tap the text field where you want me to type."
+                    }
+                } else {
+                    "Please enable Zara's Accessibility Service in Settings to use Universal Typing."
+                }
+            }
         }
     }
 }

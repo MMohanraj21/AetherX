@@ -67,6 +67,15 @@ class JarvisAccessibilityService : AccessibilityService() {
             instance?.armWhatsAppDelete(forEveryone)
         }
 
+        /**
+         * Universal text dictation/typing using existing Gboard without switching keyboards.
+         * Inserts into currently focused editable view across WhatsApp, ChatGPT, Chrome, Instagram,
+         * Telegram, Gmail, Google Docs.
+         */
+        fun typeText(text: String, append: Boolean = true): Boolean {
+            return instance?.typeDictatedText(text, append) ?: false
+        }
+
         data class ExtractedOtp(val code: String, val timestamp: Long, val senderPkg: String)
         @Volatile
         var latestExtractedOtp: ExtractedOtp? = null
@@ -526,6 +535,124 @@ class JarvisAccessibilityService : AccessibilityService() {
             if (findAndInjectEditText(child, text)) return true
         }
         return false
+    }
+
+    /**
+     * Universal Voice Dictation & Text Typing into the currently focused field.
+     * Preserves Gboard as the default keyboard; does NOT switch or install any IME.
+     * Compatible with WhatsApp, ChatGPT, Chrome, Instagram, Telegram, Gmail, Google Docs.
+     */
+    fun typeDictatedText(textToType: String, append: Boolean = true): Boolean {
+        if (textToType.isBlank()) return false
+        Log.i(TAG, "typeDictatedText: requesting to type '${textToType}' (append=$append)")
+
+        val targetNode = findCurrentFocusedEditableNode()
+        if (targetNode == null) {
+            Log.w(TAG, "typeDictatedText: No focused editable node found in active window/windows")
+            return false
+        }
+
+        if (targetNode.isPassword) {
+            Log.w(TAG, "typeDictatedText: Refusing to type into password or protected field")
+            return false
+        }
+
+        val existingText = targetNode.text?.toString() ?: ""
+        val finalText = if (append && existingText.isNotBlank()) {
+            "$existingText $textToType"
+        } else {
+            textToType
+        }
+
+        // Tier 1: Standard Android Accessibility ACTION_SET_TEXT
+        val args = Bundle().apply {
+            putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, finalText)
+        }
+        val setTextSuccess = targetNode.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args)
+        if (setTextSuccess) {
+            Log.i(TAG, "typeDictatedText: Successfully inserted text using ACTION_SET_TEXT")
+            return true
+        }
+
+        // Tier 2: Resilient fallback for WebViews, Chrome, Google Docs, Jetpack Compose fields via ACTION_PASTE
+        Log.d(TAG, "typeDictatedText: ACTION_SET_TEXT returned false. Invoking Tier 2 clipboard paste fallback")
+        return try {
+            val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+            val textForPaste = if (append && existingText.isNotBlank()) " $textToType" else textToType
+            clipboard.setPrimaryClip(ClipData.newPlainText("Zara Dictation", textForPaste))
+            val pasteSuccess = targetNode.performAction(AccessibilityNodeInfo.ACTION_PASTE)
+            Log.i(TAG, "typeDictatedText: Clipboard fallback paste success=$pasteSuccess")
+            pasteSuccess
+        } catch (e: Exception) {
+            Log.e(TAG, "typeDictatedText: Clipboard fallback paste failed: ${e.message}")
+            false
+        }
+    }
+
+    /**
+     * Locates the active focused editable node across all windows.
+     * Detects Compose views, WebViews, and native EditTexts.
+     */
+    fun findCurrentFocusedEditableNode(): AccessibilityNodeInfo? {
+        // 1. Primary check: Focused input in the root of active window
+        try {
+            val directFocus = rootInActiveWindow?.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
+            if (directFocus != null && isEditableNode(directFocus)) {
+                return directFocus
+            }
+        } catch (_: Exception) {}
+
+        // 2. Secondary check: Focused input across all active accessibility windows
+        try {
+            for (window in windows) {
+                val root = window.root ?: continue
+                val winFocus = root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
+                if (winFocus != null && isEditableNode(winFocus)) {
+                    return winFocus
+                }
+            }
+        } catch (_: Exception) {}
+
+        // 3. Fallback: Deep search for focused or editable node in active window tree
+        return try {
+            val root = getActiveRootNode() ?: return null
+            findFocusedEditableRecursive(root) ?: findFirstEditableNode(root)
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    private fun isEditableNode(node: AccessibilityNodeInfo): Boolean {
+        if (!node.isEnabled) return false
+        if (node.isEditable) return true
+        val className = node.className?.toString().orEmpty()
+        return className.contains("EditText", ignoreCase = true) ||
+                className.contains("ComposeView", ignoreCase = true) ||
+                className.contains("WebView", ignoreCase = true)
+    }
+
+    private fun findFocusedEditableRecursive(node: AccessibilityNodeInfo): AccessibilityNodeInfo? {
+        if (node.isFocused && isEditableNode(node)) {
+            return node
+        }
+        for (i in 0 until node.childCount) {
+            val child = node.getChild(i) ?: continue
+            val match = findFocusedEditableRecursive(child)
+            if (match != null) return match
+        }
+        return null
+    }
+
+    private fun findFirstEditableNode(node: AccessibilityNodeInfo): AccessibilityNodeInfo? {
+        if (isEditableNode(node)) {
+            return node
+        }
+        for (i in 0 until node.childCount) {
+            val child = node.getChild(i) ?: continue
+            val match = findFirstEditableNode(child)
+            if (match != null) return match
+        }
+        return null
     }
 
     private fun findAndClickSendInTree(node: AccessibilityNodeInfo): Boolean {

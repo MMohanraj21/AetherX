@@ -469,6 +469,41 @@ class JarvisConversationService : Service() {
         com.jarvis.assistant.automation.agent.SerializedActionExecutor.cancelAllPendingActions()
     }
 
+    private fun handleBargeInInterruption(initialChunk: ByteArray? = null, timestamp: Long = System.currentTimeMillis()) {
+        Log.i("JarvisService", "BARGE-IN: Aborting speech, cancelling active tasks, and switching to LISTENING immediately.")
+        audioPlayer?.flush()
+        try { tts?.stop() } catch (_: Exception) {}
+
+        cancelAllActiveTools()
+        com.jarvis.assistant.automation.agent.AgentTaskEngine.requestCancellation()
+        com.jarvis.assistant.automation.agent.SerializedActionExecutor.cancelAllPendingActions()
+
+        try {
+            liveWebSocket?.sendClientContent("wait")
+        } catch (_: Exception) {}
+
+        setConversationState(ConversationState.LISTENING)
+        lastUserSpeechDetectedTime = timestamp
+        hasSpeechInCurrentUtterance = true
+        hasSignalledUtteranceEnd = false
+
+        currentTurnUserText.clear()
+        currentTurnAssistantText.clear()
+        _liveUserTranscript.value = ""
+        _liveAssistantResponse.value = ""
+        hasExecutedCommandInCurrentTurn = false
+        totalVoicedFramesInCurrentUtterance = 3
+
+        synchronized(currentUtteranceAudioStream) {
+            currentUtteranceAudioStream.reset()
+            if (initialChunk != null) {
+                currentUtteranceAudioStream.write(initialChunk)
+            }
+        }
+        isCurrentTurnOwnerVoiceVerified = !preferences.isOwnerVoiceEnabled || !preferences.hasOwnerVoiceProfile()
+        updateNotification()
+    }
+
     // Pending tool call queue: tool calls are queued when owner voice verification hasn't completed yet
     private data class PendingToolCall(val callId: String, val name: String, val args: JSONObject)
     private val pendingToolCalls = java.util.concurrent.ConcurrentLinkedQueue<PendingToolCall>()
@@ -495,6 +530,7 @@ class JarvisConversationService : Service() {
         createChannel()
         initTts()
         headsetAudioRouter = com.jarvis.assistant.audio.HeadsetAudioRouter(applicationContext)
+        com.jarvis.assistant.island.ZaraIslandManager.getInstance(this).showIsland()
         taskProgressOverlay = com.jarvis.assistant.ui.agent.TaskProgressOverlay(this)
         taskProgressOverlayJob = serviceScope.launch(Dispatchers.Main.immediate) {
             combine(
@@ -992,11 +1028,10 @@ class JarvisConversationService : Service() {
                             thinkingTimeoutJob?.cancel()
                             thinkingTimeoutJob = null
                             suppressAudioUntilTurnComplete = false
-                            if (hasHeadset || _conversationState.value != ConversationState.SPEAKING) {
-                                audioPlayer?.flush()
-                                currentTurnAssistantText.clear()
-                                _liveAssistantResponse.value = ""
-                            }
+                            audioPlayer?.flush()
+                            try { tts?.stop() } catch (_: Exception) {}
+                            currentTurnAssistantText.clear()
+                            _liveAssistantResponse.value = ""
                             if (!userTurnInProgress) {
                                 currentTurnUserText.clear()
                                 _liveUserTranscript.value = ""
@@ -1340,41 +1375,22 @@ class JarvisConversationService : Service() {
 
                 if (isSpeakerActive) {
                     val hasHeadset = headsetAudioRouter?.isHeadsetConnected() == true
-                    // Only allow voice barge-in if headphones/headset are connected AND assistant is already speaking!
-                    // Over the phone loudspeaker, acoustic leakage from speaker into microphone
-                    // hits amplitudes of 0.8-1.0, which causes false self-interruption ("talks in middle and cuts off").
-                    // Over loudspeaker, users tap mic/orb to interrupt, as prompted on screen.
-                    if (hasHeadset) {
-                        if (amplitude > 0.25f) {
-                            consecutiveVoicedFrames++
-                            if (consecutiveVoicedFrames >= 4) {
-                                Log.i("JarvisService", "Headset voice barge-in: user spoke over assistant (amp=$amplitude)")
-                                audioPlayer?.flush()
-                                try { tts?.stop() } catch (_: Exception) {}
-                                setConversationState(ConversationState.LISTENING)
-                                lastUserSpeechDetectedTime = now
-                                hasSpeechInCurrentUtterance = true
-                                hasSignalledUtteranceEnd = false
-                                currentTurnUserText.clear()
-                                currentTurnAssistantText.clear()
-                                _liveUserTranscript.value = ""
-                                _liveAssistantResponse.value = ""
-                                hasExecutedCommandInCurrentTurn = false
-                                totalVoicedFramesInCurrentUtterance = 4
-                                synchronized(currentUtteranceAudioStream) {
-                                    currentUtteranceAudioStream.reset()
-                                    currentUtteranceAudioStream.write(chunk)
-                                }
-                                isCurrentTurnOwnerVoiceVerified = !preferences.isOwnerVoiceEnabled || !preferences.hasOwnerVoiceProfile()
-                                return@AudioRecorder
-                            }
-                        } else {
-                            consecutiveVoicedFrames = 0
+                    // True Voice Barge-In:
+                    // AudioRecord uses VOICE_COMMUNICATION with AcousticEchoCanceler enabled,
+                    // which cancels out speaker output. When the user speaks, their near-field voice
+                    // raises mic amplitude above the cancellation floor.
+                    val bargeInThreshold = if (hasHeadset) 0.20f else 0.28f
+
+                    if (amplitude > bargeInThreshold) {
+                        consecutiveVoicedFrames++
+                        if (consecutiveVoicedFrames >= 3) {
+                            Log.i("JarvisService", "Voice barge-in triggered! User interrupted speech (amp=$amplitude, hasHeadset=$hasHeadset)")
+                            handleBargeInInterruption(chunk, now)
+                            return@AudioRecorder
                         }
                     } else {
                         consecutiveVoicedFrames = 0
                     }
-                    // Suppress mic audio from streaming to Gemini ONLY while assistant is physically speaking over loudspeaker.
                     return@AudioRecorder
                 }
 
@@ -2515,12 +2531,16 @@ class JarvisConversationService : Service() {
         val clean = text.lowercase(Locale.ROOT).trim()
         val patterns = listOf(
             "stop", "ruk jao", "ruko", "cancel", "abort", "pause",
-            "bas karo", "thahar", "hold on", "ruk ja", "band karo"
+            "bas karo", "thahar", "hold on", "ruk ja", "band karo",
+            "wait", "wait zara", "stop speaking", "don't open", "dont open",
+            "actually do this instead", "actually", "listen to me",
+            "illa", "atha pannatha", "oru nimisham", "nillu", "kavani", "vendam",
+            "stop pannu", "wait pannu", "mat karo", "mat kholo"
         )
         val matched = patterns.firstOrNull { containsPhrase(clean, it) } ?: return false
         val matchIndex = clean.indexOf(matched)
         val precedingWords = clean.take(matchIndex).trim().split(Regex("\\s+")).takeLast(3)
-        if (precedingWords.any { it in setOf("not", "dont", "don't", "never", "without", "mat", "nahi") }) {
+        if (precedingWords.any { it in setOf("not", "dont", "don't", "never", "without", "mat", "nahi") && matched !in setOf("don't open", "dont open", "mat karo", "mat kholo", "atha pannatha", "illa") }) {
             return false
         }
         return true
@@ -2550,14 +2570,19 @@ class JarvisConversationService : Service() {
         val cleanSpeech = userSpeech.trim()
         if (cleanSpeech.isBlank()) return
 
-        if (cleanSpeech.lowercase(Locale.ROOT).matches(Regex(".*\\b(stop|cancel task|cancel automation|bas karo|ruk jao)\\b.*"))) {
+        if (cleanSpeech.lowercase(Locale.ROOT).matches(Regex(".*\\b(stop|wait|cancel|abort|don't open|dont open|cancel that|cancel task|cancel automation|atha pannatha|illa|mat karo|mat kholo|bas karo|ruk jao|ruko|stop speaking)\\b.*"))) {
+            audioPlayer?.flush()
+            try { tts?.stop() } catch (_: Exception) {}
+            cancelAllActiveTools()
             com.jarvis.assistant.automation.agent.AgentTaskEngine.requestCancellation()
+            com.jarvis.assistant.automation.agent.SerializedActionExecutor.cancelAllPendingActions()
             autonomousLoopJob?.cancel()
             activeToolJobs.forEach { it.cancel() }
             activeToolJob?.cancel()
             isAutonomousTaskRunning = false
             lastHandledCommandText = cleanSpeech
-            announce("Okay, I stopped the current task.")
+            announce("Okay, cancelled.")
+            setConversationState(ConversationState.LISTENING)
             return
         }
         if (hasExecutedCommandInCurrentTurn || cleanSpeech == lastHandledCommandText) return
@@ -3262,6 +3287,7 @@ class JarvisConversationService : Service() {
     }
 
     override fun onDestroy() {
+        com.jarvis.assistant.island.ZaraIslandManager.getInstance(this).hideIsland()
         taskProgressOverlayJob?.cancel()
         taskProgressOverlayJob = null
         taskProgressOverlay?.remove()

@@ -120,6 +120,13 @@ class SettingsFragment : Fragment() {
             "custom" -> "Custom (${preferences.customThemeColor})"
             else -> "Light Theme"
         }
+
+        // Origin Island
+        val hasOverlay = com.jarvis.assistant.island.ZaraIslandManager.getInstance(requireContext()).hasOverlayPermission()
+        val islandActive = preferences.isIslandEnabled && hasOverlay
+        binding.tvOriginIslandBadge.text = if (islandActive) "ACTIVE" else if (preferences.isIslandEnabled) "GRANT PERMISSION" else "OFF"
+        binding.tvOriginIslandBadge.setTextColor(if (islandActive) Color.parseColor("#10B981") else ContextCompat.getColor(requireContext(), R.color.accent_sapphire))
+        binding.tvOriginIslandBadge.setBackgroundResource(if (islandActive) R.drawable.bg_jarvis_status_badge_green else R.drawable.bg_jarvis_status_badge)
     }
 
     private fun setupClickListeners() {
@@ -169,7 +176,10 @@ class SettingsFragment : Fragment() {
             startActivity(Intent(requireContext(), OverlayAvatarActivity::class.java))
         }
 
-        
+        binding.rowOriginIsland.setOnClickListener {
+            showOriginIslandDialog()
+        }
+
         binding.rowDefaultAssistant.setOnClickListener {
             openDefaultAssistantSettings()
         }
@@ -214,6 +224,65 @@ class SettingsFragment : Fragment() {
     }
 
     
+    private fun showOriginIslandDialog() {
+        val islandManager = com.jarvis.assistant.island.ZaraIslandManager.getInstance(requireContext())
+        val hasOverlay = islandManager.hasOverlayPermission()
+
+        val options = arrayOf(
+            if (preferences.isIslandEnabled) "Disable Origin Island" else "Enable Origin Island",
+            if (hasOverlay) "Overlay Permission: Granted ✓" else "Grant Display Over Other Apps Permission",
+            "Grant Notification Listener Permission",
+            "Test Mode: Activate Voice Island",
+            "Test Mode: Music Marquee Preview"
+        )
+
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle("Origin Island Configuration")
+            .setItems(options) { dialog, which ->
+                when (which) {
+                    0 -> {
+                        preferences.isIslandEnabled = !preferences.isIslandEnabled
+                        if (preferences.isIslandEnabled) {
+                            islandManager.showIsland()
+                        } else {
+                            islandManager.hideIsland()
+                        }
+                        loadUserData()
+                    }
+                    1 -> {
+                        islandManager.requestOverlayPermission(requireContext())
+                    }
+                    2 -> {
+                        try {
+                            startActivity(Intent(android.provider.Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+                        } catch (_: Exception) {
+                            Toast.makeText(requireContext(), "Could not open Notification settings", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                    3 -> {
+                        islandManager.showIsland()
+                        val intent = Intent(requireContext(), com.jarvis.assistant.background.JarvisConversationService::class.java).apply {
+                            action = com.jarvis.assistant.background.JarvisConversationService.ACTION_START_CONVERSATION
+                        }
+                        androidx.core.content.ContextCompat.startForegroundService(requireContext(), intent)
+                    }
+                    4 -> {
+                        islandManager.showIsland()
+                        islandManager.updateMusic(
+                            com.jarvis.assistant.island.IslandMusicData(
+                                title = "Starboy (Official)",
+                                artist = "The Weeknd ft. Daft Punk",
+                                isPlaying = true
+                            )
+                        )
+                    }
+                }
+                dialog.dismiss()
+            }
+            .setNegativeButton("Close", null)
+            .show()
+    }
+
     private fun openDefaultAssistantSettings() {
         val intents = listOf(
             android.content.Intent(android.provider.Settings.ACTION_VOICE_INPUT_SETTINGS),

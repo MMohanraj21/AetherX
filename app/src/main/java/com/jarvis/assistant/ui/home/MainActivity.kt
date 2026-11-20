@@ -224,6 +224,9 @@ class MainActivity : AppCompatActivity() {
         super.onResume()
         viewModel.refreshSettings()
         val prefs = com.jarvis.assistant.JarvisApp.instance.preferences
+        if (prefs.isIslandEnabled && com.jarvis.assistant.island.ZaraIslandManager.getInstance(this).hasOverlayPermission()) {
+            com.jarvis.assistant.island.ZaraIslandManager.getInstance(this).showIsland()
+        }
         if (appliedThemeKey != prefs.appTheme || appliedCustomHex != prefs.customThemeColor) {
             appliedThemeKey = prefs.appTheme
             appliedCustomHex = prefs.customThemeColor

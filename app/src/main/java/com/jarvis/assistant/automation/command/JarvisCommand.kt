@@ -28,4 +28,5 @@ sealed class JarvisCommand {
     object RecallFavoriteSong : JarvisCommand()
     object RecallRoutine : JarvisCommand()
     object GoToBackground : JarvisCommand()
+    data class TypeText(val text: String, val append: Boolean = true) : JarvisCommand()
 }

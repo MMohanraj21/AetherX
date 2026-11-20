@@ -54,18 +54,18 @@ jobs:
         if: github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v2.3.0
-          name: "Zara AI Assistant v2.3 — Official Release (By Mohanraj)"
+          tag_name: v2.4.0
+          name: "Zara AI Assistant v2.4 — Origin Island & Universal Typing (By Mohanraj)"
           body: |
-            ### Zara AI Assistant
+            ### Zara AI Assistant v2.4
             Architected, Designed & Developed exclusively by Mohanraj (@Hexvora777).
             Telegram: https://t.me/Hexvora777
             Instagram: https://instagram.com/Hexvora777
-            - Full Three.js 3D Quantum Arc Reactor HUD
-            - Bidirectional Gemini Live WebSocket Voice Streaming
-            - Offline Vosk Voice Recognition Core
-            - WhatsApp & YouTube Accessibility Automation
-            - Long-term Room Database Memory
+
+            ### What's New in v2.4:
+            - **Origin Island Integration**: Apple Dynamic Island & Vivo Origin Island inspired floating pill interface with real-time waveform, thinking orbit, media controls, and notification cards.
+            - **Universal Typing with Gboard**: Dictate text directly into focused fields across WhatsApp, ChatGPT, Chrome, Instagram, Telegram, Gmail, and Google Docs while keeping Gboard untouched.
+            - **Interruptible Voice & Barge-In**: Real-time voice interruption over loudspeaker and headphones with immediate task and TTS cancellation.
           files: |
             artifacts/Zara-release.apk
             artifacts/Zara-debug.apk
