@@ -3001,7 +3001,7 @@ class JarvisConversationService : Service() {
         try {
             standbyActivatedTime = System.currentTimeMillis()
             // Phrase grammar: allow single-word "zara", multi-syllable wake phrases, phonetic matches, and [unk]
-            val grammar = "["zara", "hey zara", "hi zara", "hello zara", "ok zara", "okay zara", "wake up zara", "listen zara", "sara", "hey sara", "hi sara", "hello sara", "ok sara", "okay sara", "wake up sara", "xara", "hey xara", "zahra", "hey zahra", "[unk]"]"
+            val grammar = "[\"zara\", \"hey zara\", \"hi zara\", \"hello zara\", \"ok zara\", \"okay zara\", \"wake up zara\", \"listen zara\", \"sara\", \"hey sara\", \"hi sara\", \"hello sara\", \"ok sara\", \"okay sara\", \"wake up sara\", \"xara\", \"hey xara\", \"zahra\", \"hey zahra\", \"[unk]\"]"
             val rec = Recognizer(model, 16000.0f, grammar)
             rec.setWords(true)
             val spkModel = VoskModelManager.speakerModel
