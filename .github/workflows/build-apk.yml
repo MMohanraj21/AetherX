@@ -40,6 +40,8 @@ jobs:
               exit(0)
 
           img = Image.open(src).convert('RGBA')
+          img.save('app/src/main/res/drawable/zara_master_logo.png', 'PNG')
+          img.save('app/src/main/res/drawable/ic_zara_logo.png', 'PNG')
 
           densities = {
               'mipmap-mdpi': (48, 48, 108, 108),
@@ -57,10 +59,15 @@ jobs:
               icon.save(os.path.join(target_dir, 'ic_launcher.png'), 'PNG')
               icon.save(os.path.join(target_dir, 'ic_launcher_round.png'), 'PNG')
               
-              fg = img.resize((fw, fh), Image.Resampling.LANCZOS)
-              fg.save(os.path.join(target_dir, 'ic_launcher_foreground.png'), 'PNG')
+              fg_canvas = Image.new('RGBA', (fw, fh), (0, 0, 0, 0))
+              fg_w, fg_h = int(fw * 0.78), int(fh * 0.78)
+              resized = img.resize((fg_w, fg_h), Image.Resampling.LANCZOS)
+              offset_x = (fw - fg_w) // 2
+              offset_y = (fh - fg_h) // 2
+              fg_canvas.paste(resized, (offset_x, offset_y), resized)
+              fg_canvas.save(os.path.join(target_dir, 'ic_launcher_foreground.png'), 'PNG')
 
-          print('Launcher icons generated successfully across all densities!')
+          print('Launcher icons and drawables generated successfully across all densities!')
           "
 
       - name: Build Debug & Release APKs
@@ -90,39 +97,27 @@ jobs:
         if: github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v3.0.0
-          name: "Zara AI Assistant v3.0.0 — Next-Generation Hands-Free Personal AI Assistant"
+          tag_name: v3.0.1
+          name: "Zara AI Assistant v3.0.1 — Native Vivo Origin Island (SuperX) Status Capsule & New Brand Icon"
           body: |
-            ### Zara AI Assistant v3.0.0 (Release Build 300)
+            ### Zara AI Assistant v3.0.1 (Release Build 301)
             Architected, Designed & Developed exclusively by Mohanraj (@Hexvora777).
             Official Connections:
             - Telegram: https://t.me/Hexvora777
             - Instagram: https://instagram.com/Hexvora777
             - Motto: "Every identity has an origin. Mine is Mohanraj."
 
-            ### What's New in v3.0.0:
-            - **Phase B — Zero-Loss Single-Sentence Audio & Handover**:
-              - Seamless handover between Vosk standby and Gemini Live so single-sentence queries (e.g. *"Hey ZARA, what is quantum computing?"*) stream post-wake audio chunks directly without requiring the user to repeat the command.
-              - Intelligent wake handling: standalone wake phrases receive *"Yes, I'm listening."*, while single-sentence commands transition directly to execution without redundant interruptions.
-            - **Phase C — Four-Layer Persistent Memory Architecture (Room SQLite)**:
-              - **Layer A (Immediate Context)**: Sliding in-memory window of active dialogue turns.
-              - **Layer B (Long-Term Memory)**: Expanded `MemoryEntity` across 14 categories with importance, confidence, lastUpdated, and isOutdated flags.
-              - **Layer C (Conversation Archive)**: Relational `ConversationEntity`, `MessageEntity`, and `ConversationSummaryEntity` for full-text searchable history.
-              - **Layer D (Active Task Context)**: `TaskContextEntity` preserving active workflows and project discussions across app restarts.
-              - **Safe Database Migrations**: Implemented non-destructive `MIGRATION_1_2` in `MemoryDatabase` preventing data wipe on upgrade.
-              - Automatic migration of legacy SharedPreferences chat turns into relational SQLite tables.
-              - `MemoryRetriever`: Multi-tier contextual prompt synthesis before answering questions.
-            - **Phase D — Google Calendar & Daily Briefing Deep Integration**:
-              - Added `READ_CALENDAR` and `WRITE_CALENDAR` permissions.
-              - ContentResolver queries for today's agenda, date ranges, and conflict detection (`CalendarManager`).
-              - `DailyBriefingManager` integrates today's live calendar events into spoken briefings in Tamil, English, and Tanglish.
-              - Gemini Live `manage_calendar` tool expanded for listing events, creating meetings, and checking schedule conflicts.
-            - **Phase E — Memory Dashboard Overhaul**:
-              - Dynamic horizontal category filter chips supporting all 14 categories (`UserProfile`, `Preferences`, `Education`, `Career`, `Projects`, `Goals`, `Relationships`, `TechPreferences`, `Plans`, `Events`, `RecurringTasks`, `Summaries`, `Corrections`, `Context`).
-              - Direct JSON export control for backing up and reviewing stored memories.
-            - **Phase F — Autonomous Multi-Step Travel & Task Planning**:
-              - Autonomous trip organizer (`TravelPlanningManager`): destination extraction, date/time parsing, calendar conflict checking, Google Maps route preparation, and spoken proposal generation.
-              - Voice command parsing for trip planning in English, Tamil, and Tanglish (*"plan my trip to Hosur tomorrow"*, *"Hosur ku trip plan pannu"*).
+            ### What's New in v3.0.1:
+            - **Native Vivo Origin Island (SuperX) Status Capsule (Android 16 API 36)**:
+              - Full native integration with Vivo's punch-hole Origin Island status capsule on Vivo T5 Pro / OriginOS 6.
+              - Promoted Ongoing Notification mechanism using reflection for platform `Notification.ProgressStyle()` (`setProgress(0)`, `setStyledByProgress(false)`) and `setShortCriticalText()`.
+              - Real-time voice lifecycle transitions rendered directly by the native system compositor: `Listening` ➔ `Thinking` ➔ `Speaking` ➔ `Listening`.
+              - Zero fake floating overlays or WindowManager windows.
+              - Attached directly to the active Microphone Foreground Service to ensure zero audio disruption, no duplicate notification cards, and silent transitions (`IMPORTANCE_HIGH`, silent, vibration disabled).
+              - Automatic clean capsule collapse upon session completion or standby transition.
+            - **New Master Brand Launcher Icon**:
+              - Updated app launcher icons across all mipmap densities (`mipmap-mdpi` through `mipmap-xxxhdpi`) featuring the new official neon-gradient ZARA AI master logo.
+              - Standardized `zara_master_logo.png` and `ic_zara_logo.png` drawables with centered adaptive canvas geometry.
           files: |
             artifacts/Zara-release.apk
             artifacts/Zara-debug.apk

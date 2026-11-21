@@ -437,7 +437,17 @@ class JarvisConversationService : Service() {
     private fun setConversationState(state: ConversationState) {
         if (_conversationState.value != state) {
             _conversationState.value = state
-            updateNotification()
+            if (_isSessionOn.value && !_isStandby.value) {
+                when (state) {
+                    ConversationState.LISTENING -> com.jarvis.assistant.island.OriginIslandController.startListening(this)
+                    ConversationState.THINKING -> com.jarvis.assistant.island.OriginIslandController.startThinking(this)
+                    ConversationState.SPEAKING -> com.jarvis.assistant.island.OriginIslandController.startSpeaking(this)
+                    ConversationState.IDLE -> com.jarvis.assistant.island.OriginIslandController.startListening(this)
+                }
+            } else {
+                com.jarvis.assistant.island.OriginIslandController.dismiss(this)
+                updateNotification()
+            }
         }
     }
 
@@ -599,6 +609,7 @@ class JarvisConversationService : Service() {
                     tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
                         override fun onStart(utteranceId: String?) {
                             Log.d("JarvisService", "TTS onStart: $utteranceId")
+                            com.jarvis.assistant.island.OriginIslandController.startSpeaking(this@JarvisConversationService)
                         }
 
                         override fun onDone(utteranceId: String?) {
@@ -627,6 +638,11 @@ class JarvisConversationService : Service() {
     private fun handleTtsDone(utteranceId: String?) {
         utteranceId?.let { id ->
             ttsCallbacks.remove(id)?.invoke()
+        }
+        if (_isSessionOn.value && !_isStandby.value) {
+            com.jarvis.assistant.island.OriginIslandController.startListening(this)
+        } else {
+            com.jarvis.assistant.island.OriginIslandController.dismiss(this)
         }
     }
 
@@ -847,12 +863,12 @@ class JarvisConversationService : Service() {
                     finalizeTurn()
                     com.jarvis.assistant.audio.WakeWordManager.transitionTo(com.jarvis.assistant.audio.VoiceCycleState.RESUMING_WAKE_WORD, "Voice turn completed")
                     if (_isSessionOn.value) {
-                        setConversationState(ConversationState.IDLE)
+                        setConversationState(ConversationState.LISTENING)
                         val isForeground = com.jarvis.assistant.JarvisApp.isAppForeground.value
                         if (!isForeground && preferences.isWakeWordEnabled) {
                             serviceScope.launch(Dispatchers.Main) {
                                 delay(2000L)
-                                if (_isSessionOn.value && _conversationState.value == ConversationState.IDLE && !hasSpeechInCurrentUtterance) {
+                                if (_isSessionOn.value && _conversationState.value == ConversationState.LISTENING && !hasSpeechInCurrentUtterance) {
                                     enterStandby(announce = false)
                                     com.jarvis.assistant.audio.WakeWordManager.logEvent("WAKEWORD_RECOVERED", "Resumed standby after background conversation turn")
                                 }
@@ -3076,6 +3092,7 @@ class JarvisConversationService : Service() {
         com.jarvis.assistant.automation.agent.AgentTaskEngine.resetForSession()
         _isSessionOn.value = false
         finalizeTurn()
+        com.jarvis.assistant.island.OriginIslandController.dismiss(this)
 
 
         currentTurnAssistantText.clear()
@@ -3128,6 +3145,7 @@ class JarvisConversationService : Service() {
         hasSignalledUtteranceEnd = false
         _isStandby.value = true
         standbyActivatedTime = System.currentTimeMillis()
+        com.jarvis.assistant.island.OriginIslandController.dismiss(this)
         updateNotification()
         com.jarvis.assistant.audio.WakeWordManager.updateServiceWakeActive(true)
         com.jarvis.assistant.audio.WakeWordManager.transitionTo(com.jarvis.assistant.audio.VoiceCycleState.IDLE, "Entered standby listening")
@@ -3600,6 +3618,7 @@ class JarvisConversationService : Service() {
     // ---------------------------------------------------------------------
 
     private fun fullStop() {
+        com.jarvis.assistant.island.OriginIslandController.dismiss(this)
         stopActiveConversation()
         exitStandbyListening()
         _isStandby.value = false
@@ -3750,8 +3769,35 @@ class JarvisConversationService : Service() {
     }
 
     private fun updateNotification() {
-        (getSystemService(NOTIFICATION_SERVICE) as NotificationManager)
-            .notify(NOTIFICATION_ID, buildNotification())
+        if (_isSessionOn.value && !_isStandby.value) {
+            val state = _conversationState.value
+            when (state) {
+                ConversationState.LISTENING -> com.jarvis.assistant.island.OriginIslandController.startListening(this)
+                ConversationState.THINKING -> com.jarvis.assistant.island.OriginIslandController.startThinking(this)
+                ConversationState.SPEAKING -> com.jarvis.assistant.island.OriginIslandController.startSpeaking(this)
+                ConversationState.IDLE -> com.jarvis.assistant.island.OriginIslandController.startListening(this)
+            }
+        } else {
+            postStandardStandbyNotification()
+        }
+    }
+
+    fun postStandardStandbyNotification() {
+        val notification = buildNotification()
+        val nm = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            try {
+                startForeground(
+                    NOTIFICATION_ID,
+                    notification,
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
+                )
+            } catch (_: Exception) {
+                nm.notify(NOTIFICATION_ID, notification)
+            }
+        } else {
+            startForeground(NOTIFICATION_ID, notification)
+        }
     }
 
     private fun buildNotification(): android.app.Notification {
@@ -3776,7 +3822,7 @@ class JarvisConversationService : Service() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.ic_btn_speak_now)
+            .setSmallIcon(R.drawable.ic_zara_logo)
             .setContentTitle(title)
             .setContentText(text)
             .setContentIntent(contentIntent)

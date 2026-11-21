@@ -60,15 +60,20 @@ object NativeIslandDetector {
 
         Log.d(TAG, "Hardware Probe: Mfr=$manufacturer, Brand=$brand, Model=$model, SDK=$sdkInt, Vivo=$vivoOsVersion, Oplus=$oplusRom, Magic=$magicVersion")
 
-        // 1. Vivo Origin Island / Atomic Island verification
+        // 1. Vivo Origin Island / Atomic Island verification (including SuperX on OriginOS 6 / Android 16)
         val isVivoDevice = manufacturer.contains("vivo", ignoreCase = true) ||
                 brand.contains("vivo", ignoreCase = true) ||
                 brand.contains("iqoo", ignoreCase = true) ||
+                model.contains("vivo", ignoreCase = true) ||
+                model.contains("v2", ignoreCase = true) ||
+                model.contains("t5", ignoreCase = true) ||
                 vivoOsVersion.isNotBlank() ||
-                vivoRomVersion.isNotBlank()
+                vivoRomVersion.isNotBlank() ||
+                sdkInt >= 36
 
         if (isVivoDevice) {
             val vivoPackages = listOf(
+                "com.vivo.superx",
                 "com.vivo.origin.island",
                 "com.vivo.liveactivity",
                 "com.vivo.upslide",
@@ -89,22 +94,16 @@ object NativeIslandDetector {
                 }
             }
 
-            val hasVivoIslandFeature = pm.hasSystemFeature("vivo.hardware.origin_island") ||
-                    pm.hasSystemFeature("vivo.software.origin_island") ||
-                    pm.hasSystemFeature("vivo.software.live_activity")
-
-            if (hasVivoIslandFeature || (vivoOsVersion.contains("OriginOS", ignoreCase = true) && !vivoOsVersion.contains("1.") && !vivoOsVersion.contains("2."))) {
-                Log.i(TAG, "Native Vivo Origin Island confirmed via feature/version check")
-                return NativeIslandInfo(
-                    isSupported = true,
-                    platform = NativeIslandPlatform.VIVO_ORIGIN_ISLAND,
-                    manufacturer = manufacturer,
-                    model = model,
-                    androidVersion = sdkInt,
-                    osVersion = vivoOsVersion,
-                    systemPackage = "com.vivo.origin.island"
-                ).also { cachedInfo = it }
-            }
+            Log.i(TAG, "Native Vivo Origin Island confirmed for Vivo/Android 16 device: $manufacturer $model (OriginOS/SuperX)")
+            return NativeIslandInfo(
+                isSupported = true,
+                platform = NativeIslandPlatform.VIVO_ORIGIN_ISLAND,
+                manufacturer = manufacturer,
+                model = model,
+                androidVersion = sdkInt,
+                osVersion = if (vivoOsVersion.isNotBlank()) vivoOsVersion else vivoBuildDisplay.ifBlank { "OriginOS" },
+                systemPackage = "com.vivo.superx"
+            ).also { cachedInfo = it }
         }
 
         // 2. Oppo / OnePlus Aqua Dynamics verification

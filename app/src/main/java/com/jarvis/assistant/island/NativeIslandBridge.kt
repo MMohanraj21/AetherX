@@ -72,63 +72,11 @@ class NativeIslandBridge private constructor(private val context: Context) {
         detailText: String? = null,
         progressPercent: Int? = null
     ) {
-        if (!NativeIslandDetector.isNativeIslandSupported(context)) {
-            // Strictly disabled on unsupported devices: no popups, no overlays
-            return
-        }
-
-        try {
-            val (title, defaultText) = when (state) {
-                ConversationState.LISTENING -> "Zara is Listening" to "Listening to your voice..."
-                ConversationState.THINKING -> "Zara is Thinking" to "Processing response..."
-                ConversationState.SPEAKING -> "Zara is Speaking" to "Speaking answer..."
-                ConversationState.IDLE -> "Zara AI" to "Ready"
-            }
-
-            val text = detailText ?: defaultText
-
-            val contentIntent = PendingIntent.getActivity(
-                context,
-                0,
-                Intent(context, MainActivity::class.java).apply {
-                    flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
-                },
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-            )
-
-            val builder = NotificationCompat.Builder(context, CHANNEL_ID)
-                .setSmallIcon(android.R.drawable.ic_btn_speak_now)
-                .setContentTitle(title)
-                .setContentText(text)
-                .setContentIntent(contentIntent)
-                .setOngoing(state != ConversationState.IDLE)
-                .setCategory(NotificationCompat.CATEGORY_STATUS)
-                .setPriority(NotificationCompat.PRIORITY_LOW)
-                .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-
-            if (progressPercent != null && progressPercent in 0..100) {
-                builder.setProgress(100, progressPercent, false)
-            } else if (state == ConversationState.THINKING) {
-                builder.setProgress(100, 0, true)
-            }
-
-            // Provide Stop action when active
-            if (state != ConversationState.IDLE) {
-                val stopIntent = PendingIntent.getService(
-                    context,
-                    1,
-                    Intent(context, JarvisConversationService::class.java).apply {
-                        action = JarvisConversationService.ACTION_ENTER_STANDBY
-                    },
-                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-                )
-                builder.addAction(android.R.drawable.ic_menu_close_clear_cancel, "Pause", stopIntent)
-            }
-
-            notificationManager.notify(NOTIFICATION_ID, builder.build())
-            Log.d(TAG, "Native Island updated: state=$state, text=$text")
-        } catch (e: Exception) {
-            Log.w(TAG, "Failed to update Native Island notification: ${e.message}")
+        when (state) {
+            ConversationState.LISTENING -> OriginIslandController.startListening(context)
+            ConversationState.THINKING -> OriginIslandController.startThinking(context)
+            ConversationState.SPEAKING -> OriginIslandController.startSpeaking(context)
+            ConversationState.IDLE -> OriginIslandController.dismiss(context)
         }
     }
 
@@ -136,9 +84,6 @@ class NativeIslandBridge private constructor(private val context: Context) {
      * Clears the native Island state.
      */
     fun dismiss() {
-        if (!NativeIslandDetector.isNativeIslandSupported(context)) return
-        try {
-            notificationManager.cancel(NOTIFICATION_ID)
-        } catch (_: Exception) {}
+        OriginIslandController.dismiss(context)
     }
 }
