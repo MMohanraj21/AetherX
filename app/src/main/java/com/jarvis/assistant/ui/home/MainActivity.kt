@@ -254,12 +254,16 @@ class MainActivity : AppCompatActivity() {
         if (prefs.isIslandEnabled && islandManager.isNativeSupported()) {
             islandManager.showIsland()
         }
-        // Ensure background wake-word listening service is active in standby
+        // Ensure background wake-word listening service is active in standby ONLY if no voice session is active
         if (PermissionHelper.hasRecordAudioPermission(this) && PermissionHelper.hasNotificationPermission(this)) {
-            val serviceIntent = Intent(this, JarvisConversationService::class.java).apply {
-                action = JarvisConversationService.ACTION_ENTER_STANDBY
+            val isLive = JarvisConversationService.isSessionOn.value
+            val isStandby = JarvisConversationService.isStandby.value
+            if (!isLive && !isStandby) {
+                val serviceIntent = Intent(this, JarvisConversationService::class.java).apply {
+                    action = JarvisConversationService.ACTION_ENTER_STANDBY
+                }
+                androidx.core.content.ContextCompat.startForegroundService(this, serviceIntent)
             }
-            androidx.core.content.ContextCompat.startForegroundService(this, serviceIntent)
         }
         if (appliedThemeKey != prefs.appTheme || appliedCustomHex != prefs.customThemeColor) {
             appliedThemeKey = prefs.appTheme

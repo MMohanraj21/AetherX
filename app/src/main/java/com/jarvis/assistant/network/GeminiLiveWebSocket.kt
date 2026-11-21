@@ -216,28 +216,25 @@ class GeminiLiveWebSocket(
         val setup = JSONObject().apply {
             put("setup", JSONObject().apply {
                 put("model", activeModel)
-                put("system_instruction", JSONObject().apply {
+                put("systemInstruction", JSONObject().apply {
                     put("parts", JSONArray().put(JSONObject().put("text", effectivePrompt)))
                 })
-                put("generation_config", JSONObject().apply {
-                    put("response_modalities", JSONArray().put("AUDIO"))
-                    put("speech_config", JSONObject().apply {
-                        put("voice_config", JSONObject().apply {
-                            put("prebuilt_voice_config", JSONObject().apply {
-                                put("voice_name", voiceName)
+                put("generationConfig", JSONObject().apply {
+                    put("responseModalities", JSONArray().put("AUDIO"))
+                    put("speechConfig", JSONObject().apply {
+                        put("voiceConfig", JSONObject().apply {
+                            put("prebuiltVoiceConfig", JSONObject().apply {
+                                put("voiceName", voiceName)
                             })
                         })
                     })
                     put("temperature", 0.6)
-                    // Gemini 2.5 Flash native audio has thinking enabled by default (budget=2048),
-                    // which causes a 2-3 second delay before generating speech.
-                    // Setting thinking_budget to 0 disables chain-of-thought, yielding instant (<1s) conversational response.
-                    if (activeModel.contains("2.5")) {
-                        put("thinking_config", JSONObject().apply {
-                            put("thinking_budget", 0)
-                        })
-                    }
+                    put("thinkingConfig", JSONObject().apply {
+                        put("thinkingBudget", 0)
+                    })
                 })
+                put("inputAudioTranscription", JSONObject())
+                put("outputAudioTranscription", JSONObject())
                 put("tools", JSONArray().put(JSONObject().apply {
                     put("functionDeclarations", JSONArray().apply {
                         // 1. open_app
@@ -1117,8 +1114,8 @@ class GeminiLiveWebSocket(
     fun sendToolResponse(callId: String, functionName: String, result: JSONObject) {
         try {
             val msg = JSONObject().apply {
-                put("tool_response", JSONObject().apply {
-                    put("function_responses", JSONArray().put(JSONObject().apply {
+                put("toolResponse", JSONObject().apply {
+                    put("functionResponses", JSONArray().put(JSONObject().apply {
                         put("id", callId)
                         put("name", functionName)
                         put("response", result)
@@ -1126,7 +1123,7 @@ class GeminiLiveWebSocket(
                 })
             }
             webSocket?.send(msg.toString())
-            Log.d(TAG, "Sent tool_response for $functionName: $result")
+            Log.d(TAG, "Sent toolResponse for $functionName: $result")
         } catch (e: Exception) {
             Log.e(TAG, "sendToolResponse failed: ${e.message}", e)
         }
@@ -1152,8 +1149,6 @@ class GeminiLiveWebSocket(
      */
     fun sendMediaChunk(jpegBytes: ByteArray) {
         if (!isConnected.get() || !isSetupComplete.get() || jpegBytes.isEmpty()) return
-        // Gemini Live accepts video as a continuous realtimeInput stream at up to 1 FPS.
-        // Enforce the cap here so periodic and post-action frames share one rate limiter.
         val now = android.os.SystemClock.elapsedRealtime()
         while (true) {
             val previous = lastVideoFrameSentAt.get()
@@ -1174,11 +1169,18 @@ class GeminiLiveWebSocket(
     }
 
     /**
-     * In Gemini Live BidiGenerateContent, streaming audio via realtimeInput handles turn-taking
-     * natively via server-side neural VAD. Sending empty client_content cancels active generation.
+     * Signals locally detected end-of-speech to Gemini Live so it immediately begins
+     * generating response audio without waiting for server-side silence timeouts.
      */
     fun sendAudioStreamEnd() {
-        abortTurn()
+        if (!isConnected.get() || !isSetupComplete.get()) return
+        try {
+            val json = "{\"realtimeInput\":{\"audioStreamEnd\":true}}"
+            webSocket?.send(json)
+            Log.d(TAG, "Sent audioStreamEnd signal to Gemini Live")
+        } catch (e: Exception) {
+            Log.w(TAG, "sendAudioStreamEnd error: ${e.message}")
+        }
     }
 
     /**
@@ -1188,37 +1190,37 @@ class GeminiLiveWebSocket(
         if (!isConnected.get() || !isSetupComplete.get()) return
         try {
             val msg = JSONObject().apply {
-                put("client_content", JSONObject().apply {
+                put("clientContent", JSONObject().apply {
                     put("turns", JSONArray())
-                    put("turn_complete", true)
+                    put("turnComplete", true)
                 })
             }
             webSocket?.send(msg.toString())
-            Log.d(TAG, "Sent client_content abort signal to server")
+            Log.d(TAG, "Sent clientContent abort signal to server")
         } catch (e: Exception) {
             Log.w(TAG, "abortTurn error: ${e.message}")
         }
     }
 
     /**
-     * Sends a text prompt to Gemini Live using the client_content turn protocol.
+     * Sends a text prompt to Gemini Live using the clientContent turn protocol.
      */
     fun sendClientContent(text: String) {
         if (!isConnected.get() || !isSetupComplete.get() || text.isBlank()) return
         try {
             val msg = JSONObject().apply {
-                put("client_content", JSONObject().apply {
+                put("clientContent", JSONObject().apply {
                     put("turns", JSONArray().put(JSONObject().apply {
                         put("role", "user")
                         put("parts", JSONArray().put(JSONObject().apply {
                             put("text", text)
                         }))
                     }))
-                    put("turn_complete", true)
+                    put("turnComplete", true)
                 })
             }
             webSocket?.send(msg.toString())
-            Log.d(TAG, "Sent client_content: $text")
+            Log.d(TAG, "Sent clientContent: $text")
         } catch (e: Exception) {
             Log.e(TAG, "sendClientContent failed: ${e.message}", e)
         }

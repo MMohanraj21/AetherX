@@ -35,13 +35,21 @@ object OfflineIntentClassifier {
             return OfflineIntentResult(OfflineCapabilityRegistry.OfflineAction.TELL_TIME)
         }
 
-        // App Launch
-        val openPrefixes = listOf("open ", "launch ", "thira ", "open pannu ", "open pannunga ")
-        for (prefix in openPrefixes) {
-            if (text.startsWith(prefix) || text.contains(prefix)) {
-                val appPart = text.substringAfter(prefix).trim().split(" ").firstOrNull() ?: ""
-                if (appPart.isNotBlank()) {
-                    return OfflineIntentResult(OfflineCapabilityRegistry.OfflineAction.OPEN_APP, target = appPart)
+        // App Launch (Only for simple isolated app launches; do NOT hijack multi-step chained instructions)
+        val hasChaining = text.contains(" and ") || text.contains(" panni") || text.contains(" pannitu") ||
+                text.contains(" poi ") || text.contains(" message") || text.contains(" draft") ||
+                text.contains(" sollu") || text.contains(" check") || text.contains(" then ")
+        if (!hasChaining) {
+            val words = text.split(Regex("""\s+"""))
+            if (words.size <= 4) {
+                val openPrefixes = listOf("open ", "launch ", "thira ", "open pannu", "open pannunga")
+                for (prefix in openPrefixes) {
+                    if (text.startsWith(prefix) || text.contains(prefix)) {
+                        val appPart = text.replace(prefix, "").trim().split(" ").firstOrNull() ?: ""
+                        if (appPart.isNotBlank() && appPart !in listOf("the", "a", "my", "app")) {
+                            return OfflineIntentResult(OfflineCapabilityRegistry.OfflineAction.OPEN_APP, target = appPart)
+                        }
+                    }
                 }
             }
         }

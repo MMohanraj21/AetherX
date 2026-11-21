@@ -741,7 +741,13 @@ class JarvisConversationService : Service() {
                 com.jarvis.assistant.audio.JarvisSoundEffects.playWakeSound()
                 beginActiveConversation()
             }
-            ACTION_ENTER_STANDBY -> enterStandby(announce = false)
+            ACTION_ENTER_STANDBY -> {
+                if (!_isSessionOn.value) {
+                    enterStandby(announce = false)
+                } else {
+                    Log.i("JarvisService", "Ignored ACTION_ENTER_STANDBY: active voice conversation is currently running")
+                }
+            }
             ACTION_STOP_ALL -> {
                 fullStop()
                 return START_NOT_STICKY
@@ -1670,8 +1676,17 @@ class JarvisConversationService : Service() {
                                                 liveWebSocket?.sendMediaChunk(snapshot)
                                             }
                                         }
+                                        liveWebSocket?.sendAudioStreamEnd()
+                                        com.jarvis.assistant.audio.diagnostics.VoicePipelineDiagnostics.markStage(
+                                            com.jarvis.assistant.audio.diagnostics.VoicePipelineDiagnostics.PipelineStage.USER_TURN_DETECTION,
+                                            "Adaptive silence threshold reached (${adaptiveThreshold}ms). Dispatched audioStreamEnd."
+                                        )
                                     }
                                     setConversationState(ConversationState.THINKING)
+                                    com.jarvis.assistant.audio.diagnostics.VoicePipelineDiagnostics.markStage(
+                                        com.jarvis.assistant.audio.diagnostics.VoicePipelineDiagnostics.PipelineStage.MODEL_REQUEST_START,
+                                        "Set state to THINKING, awaiting Gemini Live response"
+                                    )
                                     thinkingTimeoutJob?.cancel()
                                     thinkingTimeoutJob = serviceScope.launch {
                                         delay(15000)
@@ -3158,12 +3173,13 @@ class JarvisConversationService : Service() {
         if (reply.isNotEmpty() && app != null) {
             val isOwnerCheckPassed = !preferences.isOwnerVoiceEnabled || !preferences.hasOwnerVoiceProfile() || isCurrentTurnOwnerVoiceVerified
             if (isOwnerCheckPassed) {
+                val finalUserText = if (query.isNotBlank()) query else "Voice message"
                 app.chatRepository.addTurn(
-                    userText = query.ifEmpty { "Spoken user query" },
+                    userText = finalUserText,
                     jarvisText = reply
                 )
                 app.memoryManager.addShortTermTurn(
-                    userText = query.ifEmpty { "Spoken user query" },
+                    userText = finalUserText,
                     jarvisText = reply
                 )
             }
@@ -3526,6 +3542,9 @@ class JarvisConversationService : Service() {
 
         val commandText = extractCommandFromHypothesis(fullUtterance)
         if (commandText.isNotBlank()) {
+            currentTurnUserText.clear()
+            currentTurnUserText.append(commandText)
+            _liveUserTranscript.value = commandText
             // SINGLE-SENTENCE WAKE WORD + COMMAND EXECUTION (PART 1 & PART 2)
             Log.i("ZaraAssistant", "COMMAND_RECOGNIZED: Extracted direct command: '$commandText'")
 
