@@ -525,6 +525,20 @@ object CommandParser {
             }
         }
 
+        // Autonomous Travel & Trip Planning: "plan my trip to Hosur tomorrow", "plan trip to Chennai", "Hosur ku trip plan pannu"
+        val tripPlanRegex = Regex("$prefix(?:plan\\s+(?:my\\s+)?trip\\s+to|plan\\s+(?:my\\s+)?travel\\s+to|trip\\s+to)\\s+(.+?)(?:\\s+(tomorrow|today|next\\s+week|naalaikku))?$", RegexOption.IGNORE_CASE)
+        val tripPlanTamil = Regex("^(.+?)(?:\\s+ku)?\\s+trip\\s+plan\\s+pannu$", RegexOption.IGNORE_CASE)
+        val tripMatch = tripPlanRegex.find(clean) ?: tripPlanTamil.find(clean)
+        if (tripMatch != null) {
+            val destination = tripMatch.groupValues[1]
+                .replace(Regex("(?i)^(?:my\\s+trip\\s+to|trip\\s+to)\\s+"), "")
+                .trim()
+            val dateDesc = if (tripMatch.groupValues.size > 2 && tripMatch.groupValues[2].isNotBlank()) tripMatch.groupValues[2] else "tomorrow"
+            if (destination.isNotBlank() && destination.length > 1) {
+                return ParsedCommandResult(JarvisCommand.PlanTrip(destination, dateDesc), 0.98f, "PLAN_TRIP")
+            }
+        }
+
         // 11. Open Apps (English, Tamil, Tanglish, Hinglish, Telugu)
         val openAppPrefixRegex = Regex("$prefix(?:open|launch|start)\\s+(?:the\\s+)?([a-zA-Z0-9\\s]+)$", RegexOption.IGNORE_CASE)
         val openAppSuffixRegex = Regex("^([a-zA-Z0-9\\s]+?)(?:\\s+(?:ah|a|va))?\\s+(?:open\\s+pannu|open\\s+pannunga|start\\s+pannu|thora|thira|open\\s+karo|kholo|open\\s+chey|open\\s+cheyyi|open\\s+பண்ணு|திற)$", RegexOption.IGNORE_CASE)

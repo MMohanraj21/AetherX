@@ -17,6 +17,7 @@ class DailyBriefingManager(
         val tasks = taskManager.getPendingTasks()
         val reminders = reminderManager.getPendingReminders()
         val recentNotes = notesManager.getAllNotes().take(3)
+        val calendarEvents = CalendarManager.getTodayEvents(context)
         val todayStr = SimpleDateFormat("EEEE, d MMMM", Locale.getDefault()).format(Date())
 
         val isTamil = language.contains("Tamil", ignoreCase = true) || language.contains("தமிழ்")
@@ -24,6 +25,15 @@ class DailyBriefingManager(
         if (isTamil) {
             val sb = StringBuilder()
             sb.append("வணக்கம்! இன்றைய ($todayStr) திட்டம்:\n\n")
+
+            if (calendarEvents.isNotEmpty()) {
+                sb.append("📅 இன்றைய கேலெண்டர் நிகழ்வுகள் (${calendarEvents.size}):\n")
+                calendarEvents.forEachIndexed { i, ev ->
+                    sb.append("${i + 1}. ${ev.title} (${ev.formattedTimeRange})\n")
+                }
+                sb.append("\n")
+            }
+
             if (tasks.isNotEmpty()) {
                 sb.append("📋 இன்றைய பணிகள் (${tasks.size}):\n")
                 tasks.forEachIndexed { i, t -> sb.append("${i + 1}. ${t.title} [${t.priority}]\n") }
@@ -47,6 +57,15 @@ class DailyBriefingManager(
         } else {
             val sb = StringBuilder()
             sb.append("Good day! Here is your daily plan for $todayStr:\n\n")
+
+            if (calendarEvents.isNotEmpty()) {
+                sb.append("📅 Today's Calendar Schedule (${calendarEvents.size}):\n")
+                calendarEvents.forEachIndexed { i, ev ->
+                    sb.append("${i + 1}. ${ev.title} (${ev.formattedTimeRange})\n")
+                }
+                sb.append("\n")
+            }
+
             if (tasks.isNotEmpty()) {
                 sb.append("📋 Pending Tasks (${tasks.size}):\n")
                 tasks.forEachIndexed { i, t -> sb.append("${i + 1}. ${t.title} (${t.priority})\n") }

@@ -37,6 +37,9 @@ class JarvisApp : Application() {
     lateinit var memoryRepository: MemoryRepository
         private set
 
+    lateinit var memoryRetriever: com.jarvis.assistant.data.memory.MemoryRetriever
+        private set
+
     lateinit var memoryManager: MemoryManager
         private set
 
@@ -66,12 +69,13 @@ class JarvisApp : Application() {
         SecurityManager.verify(this)
         instance = this
         preferences = AppPreferences(this)
-        chatRepository = ChatRepository(preferences)
 
         // Memory System
         memoryDatabase = MemoryDatabase.getInstance(this)
         memoryRepository = MemoryRepository(memoryDatabase.memoryDao())
-        memoryManager = MemoryManager(memoryRepository, preferences, chatRepository, appScope)
+        memoryRetriever = com.jarvis.assistant.data.memory.MemoryRetriever(memoryDatabase.memoryDao(), memoryDatabase.conversationDao())
+        chatRepository = ChatRepository(preferences, memoryDatabase.conversationDao(), appScope)
+        memoryManager = MemoryManager(memoryRepository, preferences, chatRepository, appScope, memoryDatabase.conversationDao())
 
         // Automation Systems
         youTubePreferences = YouTubePreferences(this)

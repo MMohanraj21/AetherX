@@ -99,6 +99,14 @@ class CommandExecutor(
                     "Please enable Zara's Accessibility Service in Settings to use Universal Typing."
                 }
             }
+            is JarvisCommand.PlanTrip -> {
+                val plan = com.jarvis.assistant.automation.travel.TravelPlanningManager.planTrip(
+                    context = phoneManager.context,
+                    destination = command.destination,
+                    targetDateDesc = command.dateDesc
+                )
+                plan.spokenSummary
+            }
         }
     }
 }

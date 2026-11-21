@@ -50,6 +50,41 @@ class MemoryActivity : AppCompatActivity() {
     private fun setupToolbar() {
         binding.btnBack.setOnClickListener { finish() }
         binding.btnAddMemory.setOnClickListener { showAddMemoryDialog() }
+        binding.btnExportMemory.setOnClickListener { exportMemoriesAsJson() }
+    }
+
+    private fun exportMemoriesAsJson() {
+        if (allMemories.isEmpty()) {
+            Toast.makeText(this, "No memories stored to export.", Toast.LENGTH_SHORT).show()
+            return
+        }
+        try {
+            val jsonArray = org.json.JSONArray()
+            for (m in allMemories) {
+                val obj = org.json.JSONObject().apply {
+                    put("id", m.id)
+                    put("category", m.category)
+                    put("key", m.key)
+                    put("value", m.value)
+                    put("rawText", m.rawText)
+                    put("timestamp", m.timestamp)
+                    put("formattedDate", m.formattedDate)
+                    put("importance", m.importance)
+                    put("isOutdated", m.isOutdated)
+                }
+                jsonArray.put(obj)
+            }
+            val jsonString = jsonArray.toString(2)
+            val sendIntent = android.content.Intent().apply {
+                action = android.content.Intent.ACTION_SEND
+                putExtra(android.content.Intent.EXTRA_TEXT, jsonString)
+                type = "text/plain"
+            }
+            val shareIntent = android.content.Intent.createChooser(sendIntent, "Export ZARA Memories (JSON)")
+            startActivity(shareIntent)
+        } catch (e: Exception) {
+            Toast.makeText(this, "Failed to export memories: ${e.message}", Toast.LENGTH_SHORT).show()
+        }
     }
 
     private fun setupRecyclerView() {
@@ -62,14 +97,33 @@ class MemoryActivity : AppCompatActivity() {
     }
 
     private fun setupCategoryChips() {
-        val chips = listOf(
-            Pair(binding.chipCategoryAll, "All"),
-            Pair(binding.chipCategoryPersonal, MemoryEntity.CATEGORY_PERSONAL),
-            Pair(binding.chipCategoryPreferences, MemoryEntity.CATEGORY_PREFERENCES),
-            Pair(binding.chipCategoryContacts, MemoryEntity.CATEGORY_CONTACTS),
-            Pair(binding.chipCategoryRoutines, MemoryEntity.CATEGORY_ROUTINES),
-            Pair(binding.chipCategoryNotes, MemoryEntity.CATEGORY_NOTES)
-        )
+        val categories = listOf("All") + MemoryEntity.ALL_CATEGORIES
+        binding.layoutCategories.removeAllViews()
+
+        val chips = mutableListOf<Pair<TextView, String>>()
+
+        for (cat in categories) {
+            val chip = TextView(this).apply {
+                text = formatCategoryDisplayName(cat)
+                textSize = 12f
+                val paddingH = (14 * resources.displayMetrics.density).toInt()
+                val paddingV = (6 * resources.displayMetrics.density).toInt()
+                setPadding(paddingH, paddingV, paddingH, paddingV)
+                val params = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply {
+                    if (chips.isNotEmpty()) {
+                        marginStart = (8 * resources.displayMetrics.density).toInt()
+                    }
+                }
+                layoutParams = params
+            }
+            binding.layoutCategories.addView(chip)
+            chips.add(Pair(chip, cat))
+        }
+
+        updateChipStyles(chips, chips.first().first)
 
         for ((view, category) in chips) {
             view.setOnClickListener {
@@ -77,6 +131,16 @@ class MemoryActivity : AppCompatActivity() {
                 updateChipStyles(chips, view)
                 filterAndDisplay()
             }
+        }
+    }
+
+    private fun formatCategoryDisplayName(category: String): String {
+        return when (category) {
+            "All" -> "All"
+            MemoryEntity.CATEGORY_USER_PROFILE -> "Profile"
+            MemoryEntity.CATEGORY_TECH_PREFERENCES -> "Tech"
+            MemoryEntity.CATEGORY_RECURRING_TASKS -> "Routines"
+            else -> category.replace(Regex("([a-z])([A-Z])"), "$1 $2")
         }
     }
 

@@ -168,20 +168,57 @@ class ZaraUtilityCommandParser(private val context: Context) {
                 }
 
                 "manage_calendar" -> {
-                    val title = args.optString("title", "Event")
-                    val hour = args.optInt("hour", 10)
-                    val minute = args.optInt("minute", 0)
-                    val cal = Calendar.getInstance().apply {
-                        set(Calendar.HOUR_OF_DAY, hour)
-                        set(Calendar.MINUTE, minute)
-                        set(Calendar.SECOND, 0)
-                        if (before(Calendar.getInstance())) {
-                            add(Calendar.DAY_OF_YEAR, 1)
+                    val action = args.optString("action", "create").lowercase()
+                    when (action) {
+                        "list", "get_today", "today" -> {
+                            val events = CalendarManager.getTodayEvents(context)
+                            result.put("success", true)
+                            result.put("count", events.size)
+                            if (events.isEmpty()) {
+                                result.put("message", "Your calendar is clear today. No events scheduled.")
+                            } else {
+                                val summary = events.joinToString("; ") { "${it.title} at ${it.formattedTimeRange}" }
+                                result.put("message", "Today's events: $summary")
+                            }
+                        }
+                        "check_conflict", "conflict" -> {
+                            val hour = args.optInt("hour", 10)
+                            val minute = args.optInt("minute", 0)
+                            val durationHours = args.optInt("duration_hours", 1)
+                            val cal = Calendar.getInstance().apply {
+                                set(Calendar.HOUR_OF_DAY, hour)
+                                set(Calendar.MINUTE, minute)
+                                set(Calendar.SECOND, 0)
+                            }
+                            val startMs = cal.timeInMillis
+                            val endMs = startMs + (durationHours * 3600_000L)
+                            val conflicts = CalendarManager.checkConflict(context, startMs, endMs)
+                            result.put("success", true)
+                            result.put("has_conflict", conflicts.isNotEmpty())
+                            if (conflicts.isEmpty()) {
+                                result.put("message", "Time slot is completely free. No conflicts.")
+                            } else {
+                                val conflictSummary = conflicts.joinToString(", ") { "${it.title} (${it.formattedTimeRange})" }
+                                result.put("message", "Conflict detected with: $conflictSummary")
+                            }
+                        }
+                        else -> {
+                            val title = args.optString("title", "Event")
+                            val hour = args.optInt("hour", 10)
+                            val minute = args.optInt("minute", 0)
+                            val cal = Calendar.getInstance().apply {
+                                set(Calendar.HOUR_OF_DAY, hour)
+                                set(Calendar.MINUTE, minute)
+                                set(Calendar.SECOND, 0)
+                                if (before(Calendar.getInstance())) {
+                                    add(Calendar.DAY_OF_YEAR, 1)
+                                }
+                            }
+                            val ok = CalendarManager.createEvent(context, title, cal.timeInMillis)
+                            result.put("success", ok)
+                            result.put("message", if (ok) "Calendar event '$title' created." else "Could not open calendar.")
                         }
                     }
-                    val ok = CalendarManager.createEvent(context, title, cal.timeInMillis)
-                    result.put("success", ok)
-                    result.put("message", if (ok) "Calendar event '$title' created." else "Could not open calendar.")
                 }
 
                 "manage_task" -> {

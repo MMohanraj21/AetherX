@@ -14,7 +14,13 @@ data class MemoryEntity(
     val key: String,
     val value: String,
     val rawText: String,
-    val timestamp: Long = System.currentTimeMillis()
+    val timestamp: Long = System.currentTimeMillis(),
+    val lastUpdated: Long = System.currentTimeMillis(),
+    val sourceConversationId: String = "",
+    val importance: Int = 1,
+    val confidence: Float = 1.0f,
+    val isOutdated: Boolean = false,
+    val expirationTime: Long = 0L
 ) {
     companion object {
         const val CATEGORY_USER_PROFILE = "UserProfile"

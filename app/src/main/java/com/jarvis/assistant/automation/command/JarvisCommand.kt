@@ -31,4 +31,5 @@ sealed class JarvisCommand {
     data class TypeText(val text: String, val append: Boolean = true) : JarvisCommand()
     data class MapsNavigate(val destination: String) : JarvisCommand()
     data class MapsSearch(val query: String) : JarvisCommand()
+    data class PlanTrip(val destination: String, val dateDesc: String = "tomorrow") : JarvisCommand()
 }

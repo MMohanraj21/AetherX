@@ -90,44 +90,39 @@ jobs:
         if: github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v2.7.0
-          name: "Zara AI Assistant v2.7.0 — Single-Sentence Wake Word & Hands-Free Background Assistant"
+          tag_name: v3.0.0
+          name: "Zara AI Assistant v3.0.0 — Next-Generation Hands-Free Personal AI Assistant"
           body: |
-            ### Zara AI Assistant v2.7.0
+            ### Zara AI Assistant v3.0.0 (Release Build 300)
             Architected, Designed & Developed exclusively by Mohanraj (@Hexvora777).
             Official Connections:
             - Telegram: https://t.me/Hexvora777
             - Instagram: https://instagram.com/Hexvora777
+            - Motto: "Every identity has an origin. Mine is Mohanraj."
 
-            ### What's New in v2.7.0:
-            - **Single-Sentence Wake Word + Command Execution**:
-              - Say wake phrase and command together in one continuous sentence without pausing or waiting for re-prompts:
-                - *"Hey ZARA, Open WhatsApp."*
-                - *"ZARA, Open YouTube."*
-                - *"Hey ZARA, Turn on Flashlight."*
-                - *"ZARA, Take me to Chennai."*
-                - *"WhatsApp open pannu"*, *"YouTube ah open pannu"*.
-              - Thread-safe 3000ms circular PCM AudioRingBuffer preserves post-wake audio context.
-            - **True Hands-Free Background Assistant**:
-              - ZARA operates seamlessly in the background without automatically taking over the screen or popping up MainActivity.
-              - When inside WhatsApp, Chrome, ChatGPT, or on the home screen, commands execute directly in the background.
-              - MainActivity is ONLY brought to the front if the user explicitly says *"Open ZARA"*.
-            - **Immediate Voice Response & Feedback**:
-              - Low-latency voice confirmations via TTS: *"Opening WhatsApp."*, *"Flashlight turned on."*, *"Navigating to Chennai."*
-              - Standalone wake greeting: responds with *"Yes, I'm listening."* immediately when called alone.
-            - **Full Indian Language & Vernacular App Control**:
-              - English, Tamil, Tanglish, Hinglish, and Telugu support for app launching, volume, brightness, and flashlight controls.
-            - **Google Maps Integration**:
-              - Dedicated GoogleMapsManager supporting turn-by-turn navigation (*"Chennai ku vazhi kaatu"*, *"Navigate to airport"*) and nearby place searches (*"Find nearest petrol bunk"*, *"Search nearby restaurants"*).
-              - Native Maps intent targeting with universal browser fallback.
-            - **14-Category Persistent Long-Term Memory (Room SQLite)**:
-              - 14 Structured categories: UserProfile, Preferences, Education, Career, Projects, Goals, Relationships, TechPreferences, Plans, Events, RecurringTasks, Summaries, Corrections, Context.
-              - Automatic background memory extraction from user conversation turns.
-              - Gemini Live tools `manage_memory` and `manage_maps` declared and wired for full conversational memory persistence.
-            - **Voice Barge-In Audio Interruption**:
-              - Immediate TTS and playback cutoff when user speech is detected during voice output.
-            - **System Diagnostics & Telemetry**:
-              - Standardized logging tags implemented across voice, execution, memory, and lifecycle pipelines.
+            ### What's New in v3.0.0:
+            - **Phase B — Zero-Loss Single-Sentence Audio & Handover**:
+              - Seamless handover between Vosk standby and Gemini Live so single-sentence queries (e.g. *"Hey ZARA, what is quantum computing?"*) stream post-wake audio chunks directly without requiring the user to repeat the command.
+              - Intelligent wake handling: standalone wake phrases receive *"Yes, I'm listening."*, while single-sentence commands transition directly to execution without redundant interruptions.
+            - **Phase C — Four-Layer Persistent Memory Architecture (Room SQLite)**:
+              - **Layer A (Immediate Context)**: Sliding in-memory window of active dialogue turns.
+              - **Layer B (Long-Term Memory)**: Expanded `MemoryEntity` across 14 categories with importance, confidence, lastUpdated, and isOutdated flags.
+              - **Layer C (Conversation Archive)**: Relational `ConversationEntity`, `MessageEntity`, and `ConversationSummaryEntity` for full-text searchable history.
+              - **Layer D (Active Task Context)**: `TaskContextEntity` preserving active workflows and project discussions across app restarts.
+              - **Safe Database Migrations**: Implemented non-destructive `MIGRATION_1_2` in `MemoryDatabase` preventing data wipe on upgrade.
+              - Automatic migration of legacy SharedPreferences chat turns into relational SQLite tables.
+              - `MemoryRetriever`: Multi-tier contextual prompt synthesis before answering questions.
+            - **Phase D — Google Calendar & Daily Briefing Deep Integration**:
+              - Added `READ_CALENDAR` and `WRITE_CALENDAR` permissions.
+              - ContentResolver queries for today's agenda, date ranges, and conflict detection (`CalendarManager`).
+              - `DailyBriefingManager` integrates today's live calendar events into spoken briefings in Tamil, English, and Tanglish.
+              - Gemini Live `manage_calendar` tool expanded for listing events, creating meetings, and checking schedule conflicts.
+            - **Phase E — Memory Dashboard Overhaul**:
+              - Dynamic horizontal category filter chips supporting all 14 categories (`UserProfile`, `Preferences`, `Education`, `Career`, `Projects`, `Goals`, `Relationships`, `TechPreferences`, `Plans`, `Events`, `RecurringTasks`, `Summaries`, `Corrections`, `Context`).
+              - Direct JSON export control for backing up and reviewing stored memories.
+            - **Phase F — Autonomous Multi-Step Travel & Task Planning**:
+              - Autonomous trip organizer (`TravelPlanningManager`): destination extraction, date/time parsing, calendar conflict checking, Google Maps route preparation, and spoken proposal generation.
+              - Voice command parsing for trip planning in English, Tamil, and Tanglish (*"plan my trip to Hosur tomorrow"*, *"Hosur ku trip plan pannu"*).
           files: |
             artifacts/Zara-release.apk
             artifacts/Zara-debug.apk

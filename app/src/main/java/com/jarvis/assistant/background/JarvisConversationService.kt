@@ -524,6 +524,8 @@ class JarvisConversationService : Service() {
     private var standbyActivatedTime = 0L
     @Volatile
     private var isPendingWakeGreeting = false
+    @Volatile
+    private var pendingCommandUtterance: String? = null
     private var headsetAudioRouter: com.jarvis.assistant.audio.HeadsetAudioRouter? = null
 
     override fun onCreate() {
@@ -909,7 +911,13 @@ class JarvisConversationService : Service() {
                                 if (_conversationState.value != ConversationState.SPEAKING && _conversationState.value != ConversationState.THINKING) {
                                     setConversationState(ConversationState.IDLE)
                                 }
-                                if (isPendingWakeGreeting) {
+                                val pendingCmd = pendingCommandUtterance
+                                if (pendingCmd != null) {
+                                    pendingCommandUtterance = null
+                                    isPendingWakeGreeting = false
+                                    Log.i("ZaraAssistant", "SENDING_PENDING_COMMAND: Dispatching user command '$pendingCmd'")
+                                    liveWebSocket?.sendClientContent(pendingCmd)
+                                } else if (isPendingWakeGreeting) {
                                     isPendingWakeGreeting = false
                                     if (!hasSpeechInCurrentUtterance) {
                                         liveWebSocket?.sendClientContent("Hey Jarvis")
@@ -3433,6 +3441,7 @@ class JarvisConversationService : Service() {
                     }
                     is com.jarvis.assistant.automation.command.JarvisCommand.MapsNavigate -> "Navigating to ${cmd.destination}."
                     is com.jarvis.assistant.automation.command.JarvisCommand.MapsSearch -> "Searching for ${cmd.query} on Maps."
+                    is com.jarvis.assistant.automation.command.JarvisCommand.PlanTrip -> "Organizing your trip to ${cmd.destination}."
                     is com.jarvis.assistant.automation.command.JarvisCommand.PlayYouTube -> "Playing ${cmd.query} on YouTube."
                     is com.jarvis.assistant.automation.command.JarvisCommand.Volume -> "Volume adjusted."
                     is com.jarvis.assistant.automation.command.JarvisCommand.Brightness -> "Brightness adjusted."
@@ -3461,9 +3470,7 @@ class JarvisConversationService : Service() {
             }
         }
 
-        // STANDALONE WAKE WORD (e.g. user said "Hey ZARA" alone)
-        // Part 2: Do NOT automatically launch MainActivity!
-        // Part 3: Immediate vocal confirmation "Yes, I'm listening."
+        // Single-Sentence utterance with conversational / non-offline command, or standalone wake word
         exitStandbyListening()
         currentTurnAssistantText.clear()
         currentTurnUserText.clear()
@@ -3471,10 +3478,22 @@ class JarvisConversationService : Service() {
         hasSignalledUtteranceEnd = false
         serviceScope.launch { _wakeEvents.emit(Unit) }
 
-        val greeting = "Yes, I'm listening."
-        Log.i("ZaraAssistant", "TTS_STARTED: Speaking '$greeting'")
-        speakImmediateVoiceResponse(greeting) {
-            Log.i("ZaraAssistant", "TTS_COMPLETED: Finished speaking greeting")
+        if (commandText.isNotBlank()) {
+            Log.i("ZaraAssistant", "SINGLE_SENTENCE_VOICE: Enqueueing post-wake audio chunks and setting pending command '$commandText'")
+            pendingCommandUtterance = commandText
+            val chunks = audioRingBuffer.getRecentAudioChunks(2200)
+            for (ch in chunks) {
+                if (preConnectAudioQueue.size < 60) {
+                    preConnectAudioQueue.offer(ch)
+                }
+            }
+        } else {
+            pendingCommandUtterance = null
+            val greeting = "Yes, I'm listening."
+            Log.i("ZaraAssistant", "TTS_STARTED: Speaking '$greeting'")
+            speakImmediateVoiceResponse(greeting) {
+                Log.i("ZaraAssistant", "TTS_COMPLETED: Finished speaking greeting")
+            }
         }
 
         // Open microphone immediately on foreground service so command is heard without delay

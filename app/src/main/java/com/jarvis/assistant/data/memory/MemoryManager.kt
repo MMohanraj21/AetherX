@@ -15,7 +15,8 @@ class MemoryManager(
     private val repository: MemoryRepository,
     private val preferences: AppPreferences,
     private val chatRepository: com.jarvis.assistant.data.repository.ChatRepository,
-    private val scope: CoroutineScope
+    private val scope: CoroutineScope,
+    private val conversationDao: ConversationDao? = null
 ) {
     companion object {
         private const val TAG = "MemoryManager"
@@ -491,6 +492,19 @@ class MemoryManager(
                     sb.append("ZARA: \"$j\"\n")
                 }
             }
+        }
+
+        // Active Tasks and Workflows (Layer D)
+        conversationDao?.let { dao ->
+            try {
+                val activeTasks = dao.getActiveTasks()
+                if (activeTasks.isNotEmpty()) {
+                    sb.append("\n[ACTIVE WORKFLOWS & CURRENT TASKS]:\n")
+                    activeTasks.forEach { task ->
+                        sb.append("- Task: ${task.title} - Goal: ${task.goal} [Status: ${task.status}]\n")
+                    }
+                }
+            } catch (_: Exception) {}
         }
 
         return sb.toString()

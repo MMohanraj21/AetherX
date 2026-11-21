@@ -64,6 +64,26 @@ class AudioRingBuffer(
         }
     }
 
+    /**
+     * Slices the most recent [durationMs] of audio into fixed-size chunks (default 1280 bytes / 40ms)
+     * suitable for immediate enqueueing into Gemini Live streaming buffers.
+     */
+    fun getRecentAudioChunks(durationMs: Int, chunkSize: Int = 1280): List<ByteArray> {
+        val raw = getRecentAudio(durationMs)
+        if (raw.isEmpty()) return emptyList()
+
+        val chunks = mutableListOf<ByteArray>()
+        var offset = 0
+        while (offset < raw.size) {
+            val length = minOf(chunkSize, raw.size - offset)
+            val chunk = ByteArray(length)
+            System.arraycopy(raw, offset, chunk, 0, length)
+            chunks.add(chunk)
+            offset += length
+        }
+        return chunks
+    }
+
     fun clear() {
         lock.withLock {
             head = 0

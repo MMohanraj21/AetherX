@@ -754,10 +754,14 @@ class GeminiLiveWebSocket(
                         // 26. manage_calendar
                         put(JSONObject().apply {
                             put("name", "manage_calendar")
-                            put("description", "Inserts calendar events into Android Calendar. E.g. 'Add meeting with team tomorrow at 10 AM', 'Create calendar event').")
+                            put("description", "Manages Google/Android Calendar events: creates events, queries today's schedule, and checks conflicts. E.g. 'Add meeting with team at 10 AM', 'What are my meetings today?', 'Check if I'm free tomorrow at 3 PM'.")
                             put("parameters", JSONObject().apply {
                                 put("type", "OBJECT")
                                 put("properties", JSONObject().apply {
+                                    put("action", JSONObject().apply {
+                                        put("type", "STRING")
+                                        put("description", "Operation: 'create' (default), 'list' (or 'today'), 'check_conflict'.")
+                                    })
                                     put("title", JSONObject().apply {
                                         put("type", "STRING")
                                         put("description", "Title of the calendar event.")
@@ -770,12 +774,15 @@ class GeminiLiveWebSocket(
                                         put("type", "INTEGER")
                                         put("description", "Event start minute (0-59).")
                                     })
+                                    put("duration_hours", JSONObject().apply {
+                                        put("type", "INTEGER")
+                                        put("description", "Duration in hours (default 1).")
+                                    })
                                     put("description", JSONObject().apply {
                                         put("type", "STRING")
                                         put("description", "Optional details or description.")
                                     })
                                 })
-                                put("required", JSONArray().put("title"))
                             })
                         })
 
