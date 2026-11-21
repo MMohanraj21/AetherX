@@ -120,55 +120,17 @@ class TaskProgressOverlay(private val context: Context) {
     }
 
     fun update(snapshot: AgentTaskSnapshot?, showIdleAvatar: Boolean = false): Boolean {
-        if (!Settings.canDrawOverlays(context)) {
-            remove()
-            return false
-        }
-        val preferences = JarvisApp.instance.preferences
-        if (snapshot == null && !showIdleAvatar && preferences.taskOverlayMode != "always") {
-            remove()
-            displayedTaskId = null
-            return true
-        }
-        if (!preferences.isTaskOverlayEnabled) {
-            remove()
-            return true
-        }
-        val selectedAvatar = preferences.taskOverlayAvatar
-        if (selectedAvatar != loadedAvatar) {
-            loadedAvatar = selectedAvatar
-            avatar.loadUrl("https://appassets.androidplatform.net/assets/overlay-toys/$selectedAvatar.html")
-        }
-        val nextTaskId = snapshot?.taskId
-        if (displayedTaskId != nextTaskId) {
-            displayedTaskId = nextTaskId
-            avatarMode = true
-        }
-        if (!attached) {
-            try {
-                if (preferences.taskOverlayFreePosition && preferences.taskOverlayX >= 0 && preferences.taskOverlayY >= 0) {
-                    params.gravity = Gravity.TOP or Gravity.LEFT
-                    params.x = preferences.taskOverlayX
-                    params.y = preferences.taskOverlayY
-                    clampPosition()
-                    currentEdge = preferences.taskOverlayEdge
-                }
-                windowManager.addView(root, params)
-                attached = true
-            } catch (_: Exception) {
-                attached = false
-                return false
-            }
-        }
-        if (currentEdge != preferences.taskOverlayEdge) applyEdge(preferences.taskOverlayEdge)
-        if (snapshot == null) renderIdle() else render(snapshot)
-        applyMode()
-        return true
+        // ZARA AI v4.0: Floating overlays are strictly deactivated in favor of
+        // native Vivo Origin Island (SuperX Status Capsule) and in-app dashboard.
+        remove()
+        return false
     }
 
     fun remove() {
         if (attached) {
-            try { windowManager.removeView(root) } catch (_: Exception) {}
+            try {
+                windowManager.removeView(root)
+            } catch (_: Exception) {}
             attached = false
         }
     }

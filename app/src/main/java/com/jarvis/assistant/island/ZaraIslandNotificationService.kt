@@ -105,6 +105,9 @@ class ZaraIslandNotificationService : NotificationListenerService() {
         )
 
         ZaraIslandManager.getInstance(this).postNotification(islandNotif)
+
+        // ZARA AI v4.0 Smart Notification Intelligence
+        com.jarvis.assistant.notification.NotificationIntelligenceManager.onNotificationReceived(this, sbn)
     }
 
     override fun onNotificationRemoved(sbn: StatusBarNotification?) {

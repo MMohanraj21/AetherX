@@ -97,27 +97,33 @@ jobs:
         if: github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v3.0.1
-          name: "Zara AI Assistant v3.0.1 — Native Vivo Origin Island (SuperX) Status Capsule & New Brand Icon"
+          tag_name: v4.0.0
+          name: "Zara AI Assistant v4.0.0 — Continuous Conversation, Smart Notifications, Call Control & Unwanted Overlay Removal"
           body: |
-            ### Zara AI Assistant v3.0.1 (Release Build 301)
+            ### Zara AI Assistant v4.0.0 (Release Build 400)
             Architected, Designed & Developed exclusively by Mohanraj (@Hexvora777).
             Official Connections:
             - Telegram: https://t.me/Hexvora777
             - Instagram: https://instagram.com/Hexvora777
             - Motto: "Every identity has an origin. Mine is Mohanraj."
 
-            ### What's New in v3.0.1:
-            - **Native Vivo Origin Island (SuperX) Status Capsule (Android 16 API 36)**:
-              - Full native integration with Vivo's punch-hole Origin Island status capsule on Vivo T5 Pro / OriginOS 6.
-              - Promoted Ongoing Notification mechanism using reflection for platform `Notification.ProgressStyle()` (`setProgress(0)`, `setStyledByProgress(false)`) and `setShortCriticalText()`.
-              - Real-time voice lifecycle transitions rendered directly by the native system compositor: `Listening` ➔ `Thinking` ➔ `Speaking` ➔ `Listening`.
-              - Zero fake floating overlays or WindowManager windows.
-              - Attached directly to the active Microphone Foreground Service to ensure zero audio disruption, no duplicate notification cards, and silent transitions (`IMPORTANCE_HIGH`, silent, vibration disabled).
-              - Automatic clean capsule collapse upon session completion or standby transition.
-            - **New Master Brand Launcher Icon**:
-              - Updated app launcher icons across all mipmap densities (`mipmap-mdpi` through `mipmap-xxxhdpi`) featuring the new official neon-gradient ZARA AI master logo.
-              - Standardized `zara_master_logo.png` and `ic_zara_logo.png` drawables with centered adaptive canvas geometry.
+            ### What's New in v4.0.0:
+            - **Unwanted Ghost Bubble Completely Removed**:
+              - Deactivated `TaskProgressOverlay` and stripped `SYSTEM_ALERT_WINDOW`.
+              - Zero floating bubble on the right side of the screen; pure native Vivo Origin Island SuperX status capsule at the top.
+            - **Continuous Conversation Engine & Audio Lifecycle Fix**:
+              - Fixed session termination after single-sentence commands; microphone remains active in `LISTENING` mode for natural follow-up speech.
+              - Replaced aggressive 2s background timeout with 15s natural dialogue window.
+              - Eliminated repetitive greeting injection ("Please tell me from the beginning / I am learning").
+            - **Smart Notification Intelligence**:
+              - Privacy filtering (excluding OTPs, passwords, bank transactions).
+              - Vocal announcement of incoming messages and contextual reply suggestions.
+              - Official Android RemoteInput reply execution with vocal confirmation.
+            - **Smart Call Announcement & Authorized Control**:
+              - Real-time telephony state tracking and caller contact resolution.
+              - Hands-free voice answering and declining in English, Tamil, and Tanglish.
+            - **Next-Gen AI Modules & Central AI Orchestrator**:
+              - Screen Intelligence, Autonomous Task Agent with safety gates, Offline AI Mode, Advanced Personal Memory v4, Smart Automation Modes, Live Language Translator, Universal Media Controller, AI Privacy Guardian, Emergency SOS Assistant, and Daily Briefing Engine.
           files: |
             artifacts/Zara-release.apk
             artifacts/Zara-debug.apk

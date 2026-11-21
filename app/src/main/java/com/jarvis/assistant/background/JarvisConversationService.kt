@@ -548,23 +548,7 @@ class JarvisConversationService : Service() {
         initTts()
         headsetAudioRouter = com.jarvis.assistant.audio.HeadsetAudioRouter(applicationContext)
         com.jarvis.assistant.island.ZaraIslandManager.getInstance(this).showIsland()
-        taskProgressOverlay = com.jarvis.assistant.ui.agent.TaskProgressOverlay(this)
-        taskProgressOverlayJob = serviceScope.launch(Dispatchers.Main.immediate) {
-            combine(
-                com.jarvis.assistant.automation.agent.AgentTaskEngine.taskState,
-                JarvisApp.isAppForeground,
-                _isSessionOn,
-                _isStandby
-            ) { snapshot, appForeground, sessionOn, standbyOn ->
-                snapshot to (JarvisApp.instance.preferences.taskOverlayMode == "always" || (!appForeground && (sessionOn || standbyOn)))
-            }.collect { (snapshot, showIdleAvatar) ->
-                val shown = taskProgressOverlay?.update(snapshot, showIdleAvatar) == true
-                if (snapshot != null && !shown && overlayPermissionWarningTaskId != snapshot.taskId) {
-                    overlayPermissionWarningTaskId = snapshot.taskId
-                    _events.emit("Task progress is shown inside Zara Home. Allow Display over other apps if you want the floating task panel over Instagram, Spotify, and Chrome.")
-                }
-            }
-        }
+        com.jarvis.assistant.telecom.CallAssistantManager.getInstance(this).startListening()
         serviceScope.launch(Dispatchers.Main.immediate) {
             var previousAvailability: List<Any>? = null
             while (isActive) {
@@ -598,7 +582,6 @@ class JarvisConversationService : Service() {
                 )
                 if (availability != previousAvailability) {
                     previousAvailability = availability
-                    taskProgressOverlay?.update(snapshot, showIdleAvatar)
                 }
             }
         }
@@ -870,10 +853,12 @@ class JarvisConversationService : Service() {
                         val isForeground = com.jarvis.assistant.JarvisApp.isAppForeground.value
                         if (!isForeground && preferences.isWakeWordEnabled) {
                             serviceScope.launch(Dispatchers.Main) {
-                                delay(2000L)
-                                if (_isSessionOn.value && _conversationState.value == ConversationState.LISTENING && !hasSpeechInCurrentUtterance) {
+                                delay(15_000L) // 15-second natural follow-up conversation window
+                                if (_isSessionOn.value && _conversationState.value == ConversationState.LISTENING &&
+                                    !hasSpeechInCurrentUtterance &&
+                                    (System.currentTimeMillis() - lastUserSpeechDetectedTime) >= 14_000L) {
                                     enterStandby(announce = false)
-                                    com.jarvis.assistant.audio.WakeWordManager.logEvent("WAKEWORD_RECOVERED", "Resumed standby after background conversation turn")
+                                    com.jarvis.assistant.audio.WakeWordManager.logEvent("WAKEWORD_RECOVERED", "Resumed standby after natural conversation follow-up window")
                                 }
                             }
                         }
@@ -938,9 +923,9 @@ class JarvisConversationService : Service() {
                                     liveWebSocket?.sendClientContent(pendingCmd)
                                 } else if (isPendingWakeGreeting) {
                                     isPendingWakeGreeting = false
-                                    if (!hasSpeechInCurrentUtterance) {
-                                        liveWebSocket?.sendClientContent("Hey Jarvis")
-                                    }
+                                    // ZARA AI v4.0 Continuous Conversation:
+                                    // Do NOT inject synthetic "Hey Jarvis" into Gemini Live.
+                                    // Microphone remains open in LISTENING state for user's continuous command.
                                 }
                             }
                         }
@@ -3431,6 +3416,20 @@ class JarvisConversationService : Service() {
             // SINGLE-SENTENCE WAKE WORD + COMMAND EXECUTION (PART 1 & PART 2)
             Log.i("ZaraAssistant", "COMMAND_RECOGNIZED: Extracted direct command: '$commandText'")
 
+            // ZARA AI v4.0 Central AI Orchestrator dispatch
+            val handledByOrchestrator = com.jarvis.assistant.orchestrator.ZaraAIOrchestrator.getInstance(this)
+                .processVoiceUtterance(commandText) { vocalFeedback ->
+                    speakImmediateVoiceResponse(vocalFeedback)
+                }
+            if (handledByOrchestrator) {
+                exitStandbyListening()
+                beginActiveConversation(wakeTriggered = false)
+                setConversationState(ConversationState.LISTENING)
+                com.jarvis.assistant.island.OriginIslandController.startListening(this)
+                lastUserSpeechDetectedTime = System.currentTimeMillis()
+                return
+            }
+
             val parsed = com.jarvis.assistant.automation.command.CommandParser.parse(commandText)
             val cmd = parsed.command
 
@@ -3484,9 +3483,24 @@ class JarvisConversationService : Service() {
                 executeDetectedCommand(cmd, commandText)
                 Log.i("ZaraAssistant", "APP_LAUNCH_VERIFIED: Successfully executed command from background")
 
-                // Cleanly re-arm wake word in standby
-                Log.i("ZaraAssistant", "WAKEWORD_RESTARTED: Re-armed standby listening for next command")
-                standbyActivatedTime = System.currentTimeMillis()
+                // ZARA AI v4.0 Continuous Conversation:
+                // Keep the microphone active and listening for follow-up speech ("Now open a particular chat", "Open Arun's chat")
+                // without terminating the conversation or forcing the user to say "Hey ZARA" again.
+                exitStandbyListening()
+                beginActiveConversation(wakeTriggered = false)
+                setConversationState(ConversationState.LISTENING)
+                com.jarvis.assistant.island.OriginIslandController.startListening(this)
+                lastUserSpeechDetectedTime = System.currentTimeMillis()
+
+                serviceScope.launch(Dispatchers.Main) {
+                    delay(15_000L) // 15-second natural follow-up conversation window
+                    if (_isSessionOn.value && _conversationState.value == ConversationState.LISTENING &&
+                        !hasSpeechInCurrentUtterance &&
+                        (System.currentTimeMillis() - lastUserSpeechDetectedTime) >= 14_000L) {
+                        Log.i("ZaraAssistant", "Follow-up conversation window elapsed. Transitioning smoothly to standby.")
+                        enterStandby(announce = false)
+                    }
+                }
                 return
             }
         }
