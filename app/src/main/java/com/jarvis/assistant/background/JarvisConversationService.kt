@@ -7,6 +7,8 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.content.pm.ServiceInfo
+import com.jarvis.assistant.R
 import android.net.Uri
 import android.os.SystemClock
 import android.media.AudioAttributes
@@ -90,6 +92,7 @@ class JarvisConversationService : Service() {
     companion object {
         const val ACTION_START_CONVERSATION = "com.jarvis.assistant.START_CONVERSATION"
         const val ACTION_STOP_ALL = "com.jarvis.assistant.STOP_ALL"
+        const val ACTION_STOP = ACTION_STOP_ALL
         const val ACTION_ENTER_STANDBY = "com.jarvis.assistant.ENTER_STANDBY"
 
         private const val CHANNEL_ID = "jarvis_conversation"
