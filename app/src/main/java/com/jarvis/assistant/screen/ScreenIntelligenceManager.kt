@@ -16,7 +16,7 @@ object ScreenIntelligenceManager {
     )
 
     fun captureCurrentScreen(): ScreenSummary? {
-        val service = JarvisAccessibilityService.activeInstance ?: return null
+        val service = JarvisAccessibilityService.instance ?: return null
         val rootNode = service.rootInActiveWindow ?: return null
 
         val labels = mutableListOf<String>()
