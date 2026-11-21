@@ -77,7 +77,7 @@ class CallAssistantManager(private val context: Context) {
 
             val service = JarvisConversationService.activeInstance
             if (service != null) {
-                OriginIslandController.startSpeaking(context, "$callerName Calling")
+                OriginIslandController.startSpeaking(context)
                 val announcement = "Sir, $callerName is calling. Would you like to attend or reject?"
                 service.speakImmediateVoiceResponse(announcement) {
                     OriginIslandController.startListening(context)
