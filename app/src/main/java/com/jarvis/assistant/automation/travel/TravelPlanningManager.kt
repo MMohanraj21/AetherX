@@ -86,6 +86,6 @@ object TravelPlanningManager {
      * Executes the finalized navigation to the destination.
      */
     fun startTripNavigation(context: Context, destination: String): Boolean {
-        return GoogleMapsManager(context).startNavigation(destination)
+        return GoogleMapsManager(context).navigateTo(destination)
     }
 }
