@@ -12,8 +12,8 @@ android {
         applicationId = "com.zara.assistant"
         minSdk = 26
         targetSdk = 34
-        versionCode = 450
-        versionName = "4.5.0"
+        versionCode = 500
+        versionName = "5.0.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "DEVELOPER_NAME", "\"Mohanraj\"")

@@ -207,7 +207,12 @@ class GeminiLiveWebSocket(
     }
 
     private fun sendSetupMessage(ws: WebSocket) {
-        val effectivePrompt = systemPrompt
+        val dynamicContext = com.jarvis.assistant.conversation.ConversationStateManager.generateContextPrompt()
+        val effectivePrompt = if (dynamicContext.isNotBlank()) {
+            "$systemPrompt\n\n[Active Conversation Context]:\n$dynamicContext"
+        } else {
+            promptProvider?.invoke() ?: systemPrompt
+        }
         val setup = JSONObject().apply {
             put("setup", JSONObject().apply {
                 put("model", activeModel)
@@ -1173,7 +1178,26 @@ class GeminiLiveWebSocket(
      * natively via server-side neural VAD. Sending empty client_content cancels active generation.
      */
     fun sendAudioStreamEnd() {
-        // No-op: server-side VAD handles turn completion smoothly
+        abortTurn()
+    }
+
+    /**
+     * Instantly aborts server generation upon user barge-in.
+     */
+    fun abortTurn() {
+        if (!isConnected.get() || !isSetupComplete.get()) return
+        try {
+            val msg = JSONObject().apply {
+                put("client_content", JSONObject().apply {
+                    put("turns", JSONArray())
+                    put("turn_complete", true)
+                })
+            }
+            webSocket?.send(msg.toString())
+            Log.d(TAG, "Sent client_content abort signal to server")
+        } catch (e: Exception) {
+            Log.w(TAG, "abortTurn error: ${e.message}")
+        }
     }
 
     /**

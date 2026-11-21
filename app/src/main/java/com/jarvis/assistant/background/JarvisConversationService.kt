@@ -248,6 +248,7 @@ class JarvisConversationService : Service() {
     private var lastUserSpeechDetectedTime = 0L
     private var lastPlaybackEndTime = 0L
     private var hasSpeechInCurrentUtterance = false
+    private var utteranceStartTime = 0L
     private var hasSignalledUtteranceEnd = false
     private var consecutiveVoicedFrames = 0
     private var totalVoicedFramesInCurrentUtterance = 0
@@ -492,7 +493,7 @@ class JarvisConversationService : Service() {
         com.jarvis.assistant.automation.agent.SerializedActionExecutor.cancelAllPendingActions()
 
         try {
-            liveWebSocket?.sendClientContent("wait")
+            liveWebSocket?.abortTurn()
         } catch (_: Exception) {}
 
         setConversationState(ConversationState.LISTENING)
@@ -1531,6 +1532,7 @@ class JarvisConversationService : Service() {
                     // Declare speech start only after several consecutive voiced frames (not a short noise blip)
                     if (consecutiveVoicedFrames >= VAD_START_FRAMES) {
                         if (!hasSpeechInCurrentUtterance) {
+                            utteranceStartTime = now
                             currentTurnUserText.clear()
                             currentTurnAssistantText.clear()
                             _liveUserTranscript.value = ""
@@ -1582,8 +1584,11 @@ class JarvisConversationService : Service() {
                     // Gradual decrement instead of instant reset: one quiet 20ms frame won't kill voiced speech tracking
                     if (consecutiveVoicedFrames > 0) consecutiveVoicedFrames--
                     val silentDuration = now - lastUserSpeechDetectedTime
+                    val speechDuration = if (utteranceStartTime > 0L) now - utteranceStartTime else 0L
+                    val currentText = currentTurnUserText.toString()
+                    val adaptiveThreshold = com.jarvis.assistant.audio.realtime.EndOfTurnDetector.getAdaptiveSilenceThreshold(currentText, speechDuration)
 
-                    if (hasSpeechInCurrentUtterance && silentDuration < 450) {
+                    if (hasSpeechInCurrentUtterance && silentDuration < adaptiveThreshold) {
                         // Keep buffering inter-word pauses so Vosk receives natural continuous audio
                         synchronized(currentUtteranceAudioStream) {
                             if (currentUtteranceAudioStream.size() < 480000) {
@@ -1596,8 +1601,8 @@ class JarvisConversationService : Service() {
                         _audioLevel.value = amplitude
                         _audioFrequency.value = frequencyData
 
-                        // Conversational pause reached (~450ms — safe for natural Hinglish speech with inter-word pauses)
-                        if (silentDuration > 450) {
+                        // Adaptive conversational pause reached (300ms for short tokens, 850ms for open clauses)
+                        if (silentDuration >= adaptiveThreshold) {
                             if (preferences.isOwnerVoiceEnabled && preferences.hasOwnerVoiceProfile()) {
                                 val isLeaseActive = (now - lastOwnerVerifiedTimestamp) < 120_000L
                                 if (isLeaseActive) {

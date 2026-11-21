@@ -97,17 +97,30 @@ jobs:
         if: github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v4.5.0
-          name: "Zara AI Assistant v4.5.0 — Conversational Intelligence & Smart Confirmation Engine"
+          tag_name: v5.0.0
+          name: "Zara AI Assistant v5.0.0 — Real-Time Live Conversational Intelligence"
           body: |
-            ### Zara AI Assistant v4.5.0 (Release Build 450)
+            ### Zara AI Assistant v5.0.0 (Release Build 500)
             Architected, Designed & Developed exclusively by Mohanraj (@Hexvora777).
             Official Connections:
             - Telegram: https://t.me/Hexvora777
             - Instagram: https://instagram.com/Hexvora777
             - Motto: "Every identity has an origin. Mine is Mohanraj."
 
-            ### What's New in v4.0.0:
+            ### What's New in v5.0.0 (Real-Time Live Conversational Intelligence):
+            - **Real-Time Live Audio Engine (`LiveAudioEngine`)**:
+              - Dedicated low-latency 16kHz PCM capture and 24kHz PCM streaming playback.
+              - Circular pre-speech buffering to completely prevent clipped initial words.
+            - **Adaptive Context-Aware Turn Taking (`EndOfTurnDetector`)**:
+              - 300ms ultra-fast turn completion for short confirmations ("yes", "send it").
+              - 850ms dynamic continuation pause for complex sentences and Tamil/Tanglish clauses ("anal", "appuram").
+            - **True Voice Barge-In & Interruption Protection**:
+              - Atomic turn epochs and instantaneous hardware `AudioTrack` flush upon user speech.
+              - Complete prevention of old audio bleed via server turn abort.
+            - **Context-Aware Smart Confirmation Gate (`MessageExecutionGate`)**:
+              - Strict verbal confirmation token bound to recipient and content hash. Zero auto-send bypasses.
+            - **Dynamic Context Retention**:
+              - Automatic multi-turn conversation and entity re-injection on WebSocket reconnects.
             - **Unwanted Ghost Bubble Completely Removed**:
               - Deactivated `TaskProgressOverlay` and stripped `SYSTEM_ALERT_WINDOW`.
               - Zero floating bubble on the right side of the screen; pure native Vivo Origin Island SuperX status capsule at the top.

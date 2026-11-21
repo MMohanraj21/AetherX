@@ -114,4 +114,24 @@ object ConversationStateManager {
             return recentEntities.toList()
         }
     }
+
+    /**
+     * Generates a context injection snippet containing current topic and recent entities
+     * to inject into Gemini Live setup instructions upon reconnection.
+     */
+    fun generateContextPrompt(): String {
+        val sb = StringBuilder()
+        val topic = _activeTopic.value
+        if (!topic.isNullOrBlank()) {
+            sb.append("ACTIVE_CONVERSATION_TOPIC: $topic\n")
+        }
+        val entities = getRecentEntitiesSnapshot()
+        if (entities.isNotEmpty()) {
+            sb.append("RECENT_CONVERSATION_ENTITIES:\n")
+            for (e in entities.take(6)) {
+                sb.append("- [${e.type}]: ${e.value} (mentioned as: \"${e.originalMention}\")\n")
+            }
+        }
+        return sb.toString().trim()
+    }
 }
