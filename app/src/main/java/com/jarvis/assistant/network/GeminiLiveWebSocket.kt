@@ -817,6 +817,62 @@ class GeminiLiveWebSocket(
                             })
                         })
 
+                        // 29. manage_memory
+                        put(JSONObject().apply {
+                            put("name", "manage_memory")
+                            put("description", "Stores, searches, retrieves, and manages long-term persistent memories in Room SQLite database across 14 categories (UserProfile, Preferences, Education, Career, Projects, Goals, Relationships, TechPreferences, Plans, Events, RecurringTasks, Summaries, Corrections, Context). Call whenever user shares facts, preferences, background, or asks what you remember.")
+                            put("parameters", JSONObject().apply {
+                                put("type", "OBJECT")
+                                put("properties", JSONObject().apply {
+                                    put("action", JSONObject().apply {
+                                        put("type", "STRING")
+                                        put("description", "Action to perform: 'save', 'search', 'get_all', 'delete', 'clear'.")
+                                    })
+                                    put("category", JSONObject().apply {
+                                        put("type", "STRING")
+                                        put("description", "Category: UserProfile, Preferences, Education, Career, Projects, Goals, Relationships, TechPreferences, Plans, Events, RecurringTasks, Summaries, Corrections, Context.")
+                                    })
+                                    put("key", JSONObject().apply {
+                                        put("type", "STRING")
+                                        put("description", "Short identifier or topic key for the memory.")
+                                    })
+                                    put("value", JSONObject().apply {
+                                        put("type", "STRING")
+                                        put("description", "The fact or detail to remember.")
+                                    })
+                                    put("query", JSONObject().apply {
+                                        put("type", "STRING")
+                                        put("description", "Search query or keyword when searching/deleting.")
+                                    })
+                                })
+                                put("required", JSONArray().put("action"))
+                            })
+                        })
+
+                        // 30. manage_maps
+                        put(JSONObject().apply {
+                            put("name", "manage_maps")
+                            put("description", "Navigates or searches locations using Google Maps. Call when user asks for directions, turn-by-turn navigation, route, or nearby places (e.g., 'Take me to Chennai', 'Navigate to airport', 'Find nearest petrol bunk', 'Chennai ku vazhi kaatu').")
+                            put("parameters", JSONObject().apply {
+                                put("type", "OBJECT")
+                                put("properties", JSONObject().apply {
+                                    put("action", JSONObject().apply {
+                                        put("type", "STRING")
+                                        put("description", "Action: 'navigate' (turn-by-turn navigation) or 'search' (nearby place search).")
+                                    })
+                                    put("destination", JSONObject().apply {
+                                        put("type", "STRING")
+                                        put("description", "Destination city, address, or landmark for navigation.")
+                                    })
+                                    put("query", JSONObject().apply {
+                                        put("type", "STRING")
+                                        put("description", "Search query for nearby places (e.g. 'petrol bunk', 'hospital', 'restaurant').")
+                                    })
+                                })
+                                put("required", JSONArray().put("action"))
+                            })
+                        })
+
 
 
                     })

@@ -29,4 +29,6 @@ sealed class JarvisCommand {
     object RecallRoutine : JarvisCommand()
     object GoToBackground : JarvisCommand()
     data class TypeText(val text: String, val append: Boolean = true) : JarvisCommand()
+    data class MapsNavigate(val destination: String) : JarvisCommand()
+    data class MapsSearch(val query: String) : JarvisCommand()
 }

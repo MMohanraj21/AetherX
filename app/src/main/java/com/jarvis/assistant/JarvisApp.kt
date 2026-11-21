@@ -55,6 +55,9 @@ class JarvisApp : Application() {
     lateinit var whatsAppAssistant: WhatsAppAssistant
         private set
 
+    lateinit var googleMapsManager: com.jarvis.assistant.automation.maps.GoogleMapsManager
+        private set
+
     lateinit var commandExecutor: CommandExecutor
         private set
 
@@ -76,13 +79,15 @@ class JarvisApp : Application() {
         contactResolver = ContactResolver(this)
         phoneControlManager = PhoneControlManager(this, contactResolver)
         whatsAppAssistant = WhatsAppAssistant(this, contactResolver)
+        googleMapsManager = com.jarvis.assistant.automation.maps.GoogleMapsManager(this)
 
         // Command Engine
         commandExecutor = CommandExecutor(
             phoneManager = phoneControlManager,
             youtubeManager = youTubeAutomationManager,
             whatsappAssistant = whatsAppAssistant,
-            memoryManager = memoryManager
+            memoryManager = memoryManager,
+            mapsManager = googleMapsManager
         )
 
         VoskModelManager.init(this, CoroutineScope(Dispatchers.Default))

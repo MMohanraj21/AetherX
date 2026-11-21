@@ -497,17 +497,47 @@ object CommandParser {
             return ParsedCommandResult(JarvisCommand.GoToBackground, 1.0f, "GO_TO_BACKGROUND")
         }
 
-        // 11. Open Apps (Strict: Must start with open/launch, not casual words)
-        val openAppRegex = Regex("$prefix(?:open|launch)\\s+(?:the\\s+)?([a-zA-Z0-9\\s]+)$", RegexOption.IGNORE_CASE)
-        val openMatch = openAppRegex.find(clean)
+        // 10c. Google Maps Navigation and Nearby Search (English, Tamil, Tanglish)
+        // A. Turn-by-turn Navigation: "take me to chennai", "navigate to marina beach", "directions to airport", "chennai ku vazhi kaatu"
+        val mapsNavRegex = Regex("$prefix(?:take\\s+me\\s+to|navigate\\s+to|directions?\\s+to|drive\\s+to|route\\s+to)\\s+(.+)$", RegexOption.IGNORE_CASE)
+        val mapsNavTamil = Regex("^(.+?)\\s*(?:ku|kku)?\\s*(?:vazhi\\s+kaatu|vazhi\\s+kaattu|route\\s+kaatu|vazhi\\s+solle|vazhi\\s+sollu|direction\\s+kaatu)$", RegexOption.IGNORE_CASE)
+        val mapsNavMatch = mapsNavRegex.find(clean) ?: mapsNavTamil.find(clean)
+        if (mapsNavMatch != null && !clean.contains("youtube") && !clean.contains("whatsapp")) {
+            val dest = mapsNavMatch.groupValues[1]
+                .replace(Regex("(?i)\\s*(?:ku|kku|please|now)$"), "")
+                .trim()
+            if (dest.isNotBlank() && dest.length > 1 && !listOf("me", "there", "here").contains(dest.lowercase(Locale.ROOT))) {
+                return ParsedCommandResult(JarvisCommand.MapsNavigate(dest), 0.97f, "MAPS_NAVIGATE")
+            }
+        }
+
+        // B. Nearby Search on Maps: "find nearest petrol bunk", "search nearby restaurants", "maps la hospital search pannu"
+        val mapsSearchRegex = Regex("$prefix(?:find\\s+nearest|search\\s+nearest|nearest|find\\s+nearby|search\\s+nearby|nearby)\\s+(.+?)(?:\\s+(?:on\\s+maps|in\\s+maps|nearby))?$", RegexOption.IGNORE_CASE)
+        val mapsSearchTamil = Regex("^(?:maps\\s+la\\s+)?(.+?)\\s*(?:thedu|search\\s+pannu|engu\\s+irukku|enga\\s+irukku)(?:\\s+maps\\s+la)?$", RegexOption.IGNORE_CASE)
+        val mapsSearchMatch = mapsSearchRegex.find(clean) ?: mapsSearchTamil.find(clean)
+        if (mapsSearchMatch != null && (clean.contains("nearest") || clean.contains("nearby") || clean.contains("maps") || clean.contains("enga") || clean.contains("engu"))) {
+            val query = mapsSearchMatch.groupValues[1]
+                .replace(Regex("(?i)^(?:maps\\s+la|in\\s+maps|on\\s+maps)\\s+"), "")
+                .replace(Regex("(?i)\\s+(?:thedu|search\\s+pannu|maps\\s+la|on\\s+maps|nearby)$"), "")
+                .trim()
+            if (query.isNotBlank() && query.length > 1) {
+                return ParsedCommandResult(JarvisCommand.MapsSearch(query), 0.96f, "MAPS_SEARCH")
+            }
+        }
+
+        // 11. Open Apps (English, Tamil, Tanglish, Hinglish, Telugu)
+        val openAppPrefixRegex = Regex("$prefix(?:open|launch|start)\\s+(?:the\\s+)?([a-zA-Z0-9\\s]+)$", RegexOption.IGNORE_CASE)
+        val openAppSuffixRegex = Regex("^([a-zA-Z0-9\\s]+?)(?:\\s+(?:ah|a|va))?\\s+(?:open\\s+pannu|open\\s+pannunga|start\\s+pannu|thora|thira|open\\s+karo|kholo|open\\s+chey|open\\s+cheyyi|open\\s+பண்ணு|திற)$", RegexOption.IGNORE_CASE)
+
+        val openMatch = openAppPrefixRegex.find(clean) ?: openAppSuffixRegex.find(clean)
         if (openMatch != null) {
             var app = openMatch.groupValues[1].trim()
-            app = app.replace(Regex("(?i)\\s+(app|application|please|for me|now)$"), "").trim()
+            app = app.replace(Regex("(?i)\\s+(app|application|please|for me|now|ah|a)$"), "").trim()
             val nonAppWords = listOf("door", "window", "gate", "bottle", "box", "bag", "something", "anything", "background", "tab", "website", "site")
             val isWebDomain = app.contains(".com") || app.contains(".dev") || app.contains(".org") ||
                     app.contains(".net") || app.contains(".io") || DomainNormalizer.isKnownWebAlias(app)
             if (app.isNotBlank() && !nonAppWords.contains(app.lowercase(Locale.ROOT)) && !isWebDomain) {
-                return ParsedCommandResult(JarvisCommand.OpenApp(app), 0.95f, "OPEN_APP")
+                return ParsedCommandResult(JarvisCommand.OpenApp(app), 0.96f, "OPEN_APP")
             }
         }
 

@@ -84,16 +84,32 @@ class MemoryManager(
 
         val lower = clean.lowercase(Locale.ROOT)
         val category = when {
-            lower.contains("favorite") || lower.contains("prefer") || lower.contains("like") || lower.contains("song") || lower.contains("music") || lower.contains("app") || lower.contains("pasand") ->
+            lower.contains("favorite") || lower.contains("prefer") || lower.contains("like") || lower.contains("song") || lower.contains("music") || lower.contains("app") || lower.contains("pasand") || lower.contains("pidikkum") ->
                 MemoryEntity.CATEGORY_PREFERENCES
-            lower.contains("routine") || lower.contains("gym") || lower.contains("work") || lower.contains("wake up") || lower.contains("sleep") || lower.contains("at ") || lower.contains("pm") || lower.contains("am") ->
-                MemoryEntity.CATEGORY_ROUTINES
-            lower.contains("name") || lower.contains("birthday") || lower.contains("live in") || lower.contains("age") || lower.contains("i am") || lower.contains("my ") || lower.contains("mera") || lower.contains("meri") ->
-                MemoryEntity.CATEGORY_PERSONAL
-            lower.contains("call") || lower.contains("contact") || lower.contains("phone") || lower.contains("number") || lower.contains("friend") || lower.contains("brother") || lower.contains("sister") || lower.contains("mom") || lower.contains("dad") || lower.contains("bhai") || lower.contains("dost") ->
-                MemoryEntity.CATEGORY_CONTACTS
+            lower.contains("routine") || lower.contains("gym") || lower.contains("wake up") || lower.contains("sleep") || lower.contains("habit") ->
+                MemoryEntity.CATEGORY_RECURRING_TASKS
+            lower.contains("name") || lower.contains("birthday") || lower.contains("live in") || lower.contains("age") || lower.contains("i am") || lower.contains("my ") || lower.contains("peyar") ->
+                MemoryEntity.CATEGORY_USER_PROFILE
+            lower.contains("college") || lower.contains("school") || lower.contains("degree") || lower.contains("study") || lower.contains("studying") || lower.contains("graduated") ->
+                MemoryEntity.CATEGORY_EDUCATION
+            lower.contains("work") || lower.contains("job") || lower.contains("company") || lower.contains("office") || lower.contains("role") || lower.contains("salary") ->
+                MemoryEntity.CATEGORY_CAREER
+            lower.contains("project") || lower.contains("aetherx") || lower.contains("zara") || lower.contains("app") || lower.contains("repo") ->
+                MemoryEntity.CATEGORY_PROJECTS
+            lower.contains("goal") || lower.contains("aim") || lower.contains("aspire") || lower.contains("target") ->
+                MemoryEntity.CATEGORY_GOALS
+            lower.contains("brother") || lower.contains("sister") || lower.contains("mom") || lower.contains("dad") || lower.contains("friend") || lower.contains("girlfriend") || lower.contains("wife") ->
+                MemoryEntity.CATEGORY_RELATIONSHIPS
+            lower.contains("kotlin") || lower.contains("python") || lower.contains("linux") || lower.contains("android") || lower.contains("code") || lower.contains("tech") ->
+                MemoryEntity.CATEGORY_TECH_PREFERENCES
+            lower.contains("trip") || lower.contains("visit") || lower.contains("travel") || lower.contains("flight") || lower.contains("hotel") ->
+                MemoryEntity.CATEGORY_PLANS
+            lower.contains("meeting") || lower.contains("party") || lower.contains("event") || lower.contains("anniversary") ->
+                MemoryEntity.CATEGORY_EVENTS
+            lower.contains("wrong") || lower.contains("incorrect") || lower.contains("correction") || lower.contains("change") ->
+                MemoryEntity.CATEGORY_CORRECTIONS
             else ->
-                MemoryEntity.CATEGORY_NOTES
+                MemoryEntity.CATEGORY_CONTEXT
         }
 
         val key = clean.take(40).trim()
@@ -103,7 +119,7 @@ class MemoryManager(
             key = key,
             value = clean
         )
-        Log.i(TAG, "Saved long-term memory in category '$category': $clean")
+        Log.i("ZaraAssistant", "MEMORY_SAVED: Category='$category', Key='$key', Text='$clean'")
         val response = "Sir, I have permanently committed that to memory: $clean."
         chatRepository.addTurn(clean, response)
         return response
@@ -410,6 +426,22 @@ class MemoryManager(
                     Log.i(TAG, "Learned general preference: $topic -> $prefValue")
                 }
             }
+
+            // 10. 14-Category Autonomous Memory Extractor
+            try {
+                val extractedFacts = MemoryExtractor.extract(clean)
+                for (fact in extractedFacts) {
+                    repository.saveMemory(
+                        rawText = fact.rawText,
+                        category = fact.category,
+                        key = fact.key,
+                        value = fact.value
+                    )
+                    Log.i("ZaraAssistant", "MEMORY_SAVED: [${fact.category}] ${fact.key} -> ${fact.value}")
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "MemoryExtractor error: ${e.message}")
+            }
         }
     }
 
@@ -422,6 +454,7 @@ class MemoryManager(
      */
     suspend fun getSystemPromptContext(): String {
         val all = repository.getAllMemories()
+        Log.i("ZaraAssistant", "MEMORY_RETRIEVED: Loaded ${all.size} permanent memories from database")
         val favSong = resolveSongQuery("my favorite song")
         val sb = StringBuilder("\n[USER PERSONAL PROFILE & MEMORY CORE - PERMANENT STORAGE]:\n")
         sb.append("- User's Preferred Name: ${preferences.userName.ifBlank { "Sir" }}\n")

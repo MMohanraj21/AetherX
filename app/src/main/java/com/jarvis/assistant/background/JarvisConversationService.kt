@@ -517,6 +517,8 @@ class JarvisConversationService : Service() {
     // --- Standby / wake-word components (Pure Vosk) ---
     private var voskSpeechService: SpeechService? = null
     private var tts: TextToSpeech? = null
+    private val ttsCallbacks = java.util.concurrent.ConcurrentHashMap<String, () -> Unit>()
+    private val audioRingBuffer = com.jarvis.assistant.audio.AudioRingBuffer(capacityMs = 3000)
     private var wakeLock: PowerManager.WakeLock? = null
     private var wifiLock: android.net.wifi.WifiManager.WifiLock? = null
     private var standbyActivatedTime = 0L
@@ -621,7 +623,39 @@ class JarvisConversationService : Service() {
     }
 
     private fun handleTtsDone(utteranceId: String?) {
-        // Robotic system announcements disabled; all speech is handled via natural Gemini Live neural audio.
+        utteranceId?.let { id ->
+            ttsCallbacks.remove(id)?.invoke()
+        }
+    }
+
+    /**
+     * Speaks an immediate voice response using Android TTS with completion callback.
+     * Used for single-sentence command feedback ("Opening WhatsApp.") and standalone
+     * wake greeting ("Yes, I'm listening.").
+     */
+    fun speakImmediateVoiceResponse(text: String, onDone: (() -> Unit)? = null) {
+        if (text.isBlank()) {
+            onDone?.invoke()
+            return
+        }
+        serviceScope.launch(Dispatchers.Main) {
+            try {
+                if (tts == null) {
+                    initTts()
+                }
+                val utteranceId = "zara_voice_${System.currentTimeMillis()}"
+                if (onDone != null) {
+                    ttsCallbacks[utteranceId] = onDone
+                }
+                val params = Bundle().apply {
+                    putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, 1.0f)
+                }
+                tts?.speak(text, TextToSpeech.QUEUE_FLUSH, params, utteranceId)
+            } catch (e: Exception) {
+                Log.e("JarvisService", "Error in speakImmediateVoiceResponse: ${e.message}")
+                onDone?.invoke()
+            }
+        }
     }
 
     private fun ensureMicrophoneForegroundService() {
@@ -1370,6 +1404,7 @@ class JarvisConversationService : Service() {
         }
 
         audioRecorder = AudioRecorder { chunk, amplitude, frequencyData ->
+            audioRingBuffer.write(chunk, chunk.size)
             if (_isSessionOn.value) {
                 val now = System.currentTimeMillis()
 
@@ -2348,6 +2383,102 @@ class JarvisConversationService : Service() {
                         }
                     }
 
+                    "manage_memory" -> {
+                        val app = application as? JarvisApp
+                        val action = args.optString("action", "save").lowercase(Locale.ROOT)
+                        val category = args.optString("category", com.jarvis.assistant.data.memory.MemoryEntity.CATEGORY_CONTEXT)
+                        val key = args.optString("key", "")
+                        val value = args.optString("value", "")
+                        val query = args.optString("query", value)
+                        when (action) {
+                            "save" -> {
+                                val text = if (value.isNotBlank()) value else query
+                                val saveKey = if (key.isNotBlank()) key else text.take(30)
+                                app?.memoryRepository?.saveMemory(
+                                    rawText = text,
+                                    category = category,
+                                    key = saveKey,
+                                    value = text
+                                )
+                                Log.i("ZaraAssistant", "MEMORY_SAVED: [$category] $saveKey")
+                                result.put("success", true)
+                                result.put("message", "Permanently committed to memory in $category: $text")
+                            }
+                            "search" -> {
+                                val memories = app?.memoryRepository?.searchMemories(query) ?: emptyList()
+                                Log.i("ZaraAssistant", "MEMORY_RETRIEVED: Found ${memories.size} memories matching '$query'")
+                                val arr = org.json.JSONArray()
+                                memories.take(10).forEach { mem ->
+                                    arr.put(JSONObject().apply {
+                                        put("category", mem.category)
+                                        put("key", mem.key)
+                                        put("value", mem.value)
+                                        put("rawText", mem.rawText)
+                                    })
+                                }
+                                result.put("success", true)
+                                result.put("memories", arr)
+                                result.put("count", memories.size)
+                            }
+                            "get_all" -> {
+                                val all = app?.memoryRepository?.getAllMemories() ?: emptyList()
+                                Log.i("ZaraAssistant", "MEMORY_RETRIEVED: Retrieved all ${all.size} memories")
+                                val arr = org.json.JSONArray()
+                                all.take(30).forEach { mem ->
+                                    arr.put(JSONObject().apply {
+                                        put("category", mem.category)
+                                        put("key", mem.key)
+                                        put("value", mem.value)
+                                        put("rawText", mem.rawText)
+                                    })
+                                }
+                                result.put("success", true)
+                                result.put("memories", arr)
+                                result.put("count", all.size)
+                            }
+                            "delete" -> {
+                                val deleted = app?.memoryRepository?.deleteMemoriesByKeyword(query) ?: 0
+                                Log.i("ZaraAssistant", "MEMORY_UPDATED: Deleted $deleted memories matching '$query'")
+                                result.put("success", true)
+                                result.put("deleted_count", deleted)
+                                result.put("message", "Erased $deleted memory records matching '$query'")
+                            }
+                            "clear" -> {
+                                app?.memoryRepository?.clearAll()
+                                result.put("success", true)
+                                result.put("message", "Cleared all permanent memories")
+                            }
+                            else -> {
+                                result.put("success", false)
+                                result.put("message", "Unknown memory action: $action")
+                            }
+                        }
+                    }
+
+                    "manage_maps" -> {
+                        val app = application as? JarvisApp
+                        val action = args.optString("action", "navigate").lowercase(Locale.ROOT)
+                        val destination = args.optString("destination", "")
+                        val query = args.optString("query", destination)
+                        when (action) {
+                            "navigate", "directions" -> {
+                                val target = if (destination.isNotBlank()) destination else query
+                                val ok = app?.googleMapsManager?.navigateTo(target) ?: false
+                                result.put("success", ok)
+                                result.put("message", if (ok) "Navigating to $target on Maps" else "Could not open Maps for $target")
+                            }
+                            "search" -> {
+                                val ok = app?.googleMapsManager?.searchNearby(query) ?: false
+                                result.put("success", ok)
+                                result.put("message", if (ok) "Searching for $query on Maps" else "Could not search $query on Maps")
+                            }
+                            else -> {
+                                result.put("success", false)
+                                result.put("message", "Unknown maps action: $action")
+                            }
+                        }
+                    }
+
 
                     else -> {
                         Log.w("JarvisService", "Unknown toolCall name: $name")
@@ -3033,8 +3164,24 @@ class JarvisConversationService : Service() {
 
         try {
             standbyActivatedTime = System.currentTimeMillis()
-            // Phrase grammar: allow single-word "zara", multi-syllable wake phrases, phonetic matches, and [unk]
-            val grammar = "[\"zara\", \"hey zara\", \"hi zara\", \"hello zara\", \"ok zara\", \"okay zara\", \"wake up zara\", \"listen zara\", \"sara\", \"hey sara\", \"hi sara\", \"hello sara\", \"ok sara\", \"okay sara\", \"wake up sara\", \"xara\", \"hey xara\", \"zahra\", \"hey zahra\", \"[unk]\"]"
+            // Phrase grammar: allow single-word "zara", multi-syllable wake phrases, common command verbs,
+            // app names, Google Maps, Indian/Tamil/Tanglish controls, and [unk]
+            val vocabulary = listOf(
+                "zara", "hey zara", "hi zara", "hello zara", "ok zara", "okay zara", "wake up zara", "listen zara",
+                "sara", "hey sara", "hi sara", "hello sara", "ok sara", "okay sara", "wake up sara",
+                "xara", "hey xara", "zahra", "hey zahra",
+                "open", "launch", "start", "turn", "on", "off", "switch", "toggle", "navigate", "take", "me", "to",
+                "find", "search", "call", "dial", "what", "time", "is", "it", "date", "battery", "level",
+                "set", "alarm", "timer", "reminder", "note", "stop", "pause", "resume", "play",
+                "flashlight", "torch", "volume", "up", "down", "mute", "unmute", "increase", "decrease", "brightness",
+                "whatsapp", "youtube", "instagram", "chrome", "chatgpt", "camera", "maps", "google", "settings",
+                "gallery", "photos", "spotify", "music", "telegram", "calculator", "phone", "contacts", "messages",
+                "files", "gmail", "store", "clock", "calendar", "browser",
+                "chennai", "home", "work", "office", "petrol", "bunk", "hospital", "hotel", "restaurant", "route", "directions",
+                "pannu", "thora", "thira", "podu", "vazhi", "kaatu", "kaattu", "thedu", "irukku", "enna", "mani", "solle", "sollu", "ah",
+                "[unk]"
+            )
+            val grammar = org.json.JSONArray(vocabulary).toString()
             val rec = Recognizer(model, 16000.0f, grammar)
             rec.setWords(true)
             val spkModel = VoskModelManager.speakerModel
@@ -3190,8 +3337,8 @@ class JarvisConversationService : Service() {
                 }
             }
 
-            Log.i("JarvisService", "Vosk confirmed wake word: '$cleanPhrase' (conf=$avgConf, duration=${duration}s)")
-            onWakeWordDetected()
+            Log.i("ZaraAssistant", "WAKE_WORD_DETECTED: Vosk confirmed wake word in '$cleanPhrase' (conf=$avgConf, duration=${duration}s)")
+            onWakeWordDetected(cleanPhrase)
         } catch (e: Exception) {
             Log.e("JarvisService", "Error in checkVoskHypothesis: ${e.message}")
         }
@@ -3237,12 +3384,86 @@ class JarvisConversationService : Service() {
         } catch (_: Exception) {}
     }
 
-    private fun onWakeWordDetected() {
+    private fun extractCommandFromHypothesis(fullPhrase: String): String {
+        val wakePrefixRegex = Regex("(?i)^(?:hey|hi|hello|ok|okay|wake\\s+up|listen)?\\s*(?:zara|sara|zahra|xara)[,\\s]*")
+        return fullPhrase.replace(wakePrefixRegex, "").trim()
+    }
+
+    private fun onWakeWordDetected(fullUtterance: String = "") {
         if (!_isStandby.value) return
+        Log.i("ZaraAssistant", "WAKE_WORD_DETECTED: Confirmed wake phrase: '$fullUtterance'")
         com.jarvis.assistant.audio.WakeWordManager.transitionTo(com.jarvis.assistant.audio.VoiceCycleState.WAKE_WORD_DETECTED, "Vosk detected wake word")
         requestAudioDuckFocus()
         vibrateBriefly()
         com.jarvis.assistant.audio.JarvisSoundEffects.playWakeSound()
+
+        val commandText = extractCommandFromHypothesis(fullUtterance)
+        if (commandText.isNotBlank()) {
+            // SINGLE-SENTENCE WAKE WORD + COMMAND EXECUTION (PART 1 & PART 2)
+            Log.i("ZaraAssistant", "COMMAND_RECOGNIZED: Extracted direct command: '$commandText'")
+
+            val parsed = com.jarvis.assistant.automation.command.CommandParser.parse(commandText)
+            val cmd = parsed.command
+
+            if (cmd != null) {
+                Log.i("ZaraAssistant", "INTENT_CLASSIFIED: $cmd")
+                val isTargetingZara = (cmd is com.jarvis.assistant.automation.command.JarvisCommand.OpenApp &&
+                        (cmd.packageName.lowercase().contains("zara") || cmd.packageName.lowercase().contains("assistant"))) ||
+                        commandText.contains("open zara") || commandText.contains("launch zara")
+
+                // Part 2: ONLY open MainActivity if user explicitly requested to open ZARA!
+                if (isTargetingZara) {
+                    Log.i("ZaraAssistant", "APP_LAUNCH_REQUESTED: Launching ZARA UI")
+                    launchAssistantUiFromBackground()
+                    speakImmediateVoiceResponse("Opening Zara.")
+                    Log.i("ZaraAssistant", "APP_LAUNCH_VERIFIED: ZARA UI brought to front")
+                    exitStandbyListening()
+                    beginActiveConversation(wakeTriggered = true)
+                    return
+                }
+
+                // Hands-Free Background Execution (Part 2 & Part 3)
+                val feedbackText = when (cmd) {
+                    is com.jarvis.assistant.automation.command.JarvisCommand.OpenApp -> {
+                        val appName = cmd.packageName.replaceFirstChar { it.uppercase() }
+                        "Opening $appName."
+                    }
+                    is com.jarvis.assistant.automation.command.JarvisCommand.Flash -> {
+                        if (cmd.enabled) "Flashlight turned on." else "Flashlight turned off."
+                    }
+                    is com.jarvis.assistant.automation.command.JarvisCommand.MapsNavigate -> "Navigating to ${cmd.destination}."
+                    is com.jarvis.assistant.automation.command.JarvisCommand.MapsSearch -> "Searching for ${cmd.query} on Maps."
+                    is com.jarvis.assistant.automation.command.JarvisCommand.PlayYouTube -> "Playing ${cmd.query} on YouTube."
+                    is com.jarvis.assistant.automation.command.JarvisCommand.Volume -> "Volume adjusted."
+                    is com.jarvis.assistant.automation.command.JarvisCommand.Brightness -> "Brightness adjusted."
+                    is com.jarvis.assistant.automation.command.JarvisCommand.GoToBackground -> "Going to background."
+                    else -> ""
+                }
+
+                if (feedbackText.isNotBlank()) {
+                    Log.i("ZaraAssistant", "TTS_STARTED: Speaking '$feedbackText'")
+                    speakImmediateVoiceResponse(feedbackText) {
+                        Log.i("ZaraAssistant", "TTS_COMPLETED: Feedback speech completed")
+                    }
+                }
+
+                if (cmd is com.jarvis.assistant.automation.command.JarvisCommand.OpenApp) {
+                    Log.i("ZaraAssistant", "APP_LAUNCH_REQUESTED: Launching ${cmd.packageName} from background")
+                }
+
+                executeDetectedCommand(cmd, commandText)
+                Log.i("ZaraAssistant", "APP_LAUNCH_VERIFIED: Successfully executed command from background")
+
+                // Cleanly re-arm wake word in standby
+                Log.i("ZaraAssistant", "WAKEWORD_RESTARTED: Re-armed standby listening for next command")
+                standbyActivatedTime = System.currentTimeMillis()
+                return
+            }
+        }
+
+        // STANDALONE WAKE WORD (e.g. user said "Hey ZARA" alone)
+        // Part 2: Do NOT automatically launch MainActivity!
+        // Part 3: Immediate vocal confirmation "Yes, I'm listening."
         exitStandbyListening()
         currentTurnAssistantText.clear()
         currentTurnUserText.clear()
@@ -3250,9 +3471,11 @@ class JarvisConversationService : Service() {
         hasSignalledUtteranceEnd = false
         serviceScope.launch { _wakeEvents.emit(Unit) }
 
-        // Launch ZARA conversation interface seamlessly from background / lock screen
-        com.jarvis.assistant.audio.WakeWordManager.transitionTo(com.jarvis.assistant.audio.VoiceCycleState.ACTIVATING, "Launching interface")
-        launchAssistantUiFromBackground()
+        val greeting = "Yes, I'm listening."
+        Log.i("ZaraAssistant", "TTS_STARTED: Speaking '$greeting'")
+        speakImmediateVoiceResponse(greeting) {
+            Log.i("ZaraAssistant", "TTS_COMPLETED: Finished speaking greeting")
+        }
 
         // Open microphone immediately on foreground service so command is heard without delay
         com.jarvis.assistant.audio.WakeWordManager.transitionTo(com.jarvis.assistant.audio.VoiceCycleState.LISTENING, "Listening for voice command")

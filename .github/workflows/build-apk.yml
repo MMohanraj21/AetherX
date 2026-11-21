@@ -90,36 +90,44 @@ jobs:
         if: github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v2.6.0
-          name: "Zara AI Assistant v2.6.0 — Permanent Wake Word & Smart Personal Organizer"
+          tag_name: v2.7.0
+          name: "Zara AI Assistant v2.7.0 — Single-Sentence Wake Word & Hands-Free Background Assistant"
           body: |
-            ### Zara AI Assistant v2.6.0
+            ### Zara AI Assistant v2.7.0
             Architected, Designed & Developed exclusively by Mohanraj (@Hexvora777).
             Official Connections:
             - Telegram: https://t.me/Hexvora777
             - Instagram: https://instagram.com/Hexvora777
 
-            ### What's New in v2.6.0:
-            - **Official ZARA AI Identity & Branding**:
-              - Brand new high-resolution glowing neon cyber logo.
-              - 100% complete eradication of legacy "Jarvis" naming across all UI screens, toasts, dialogs, overlays, and notifications.
-              - **Permanent Creator Recognition Protocol**: Unconditionally identifies Mohanraj (@Hexvora777) as the sole creator and developer in Tamil, English, Hindi, and all languages.
-            - **Default Digital Assistant Integration**:
-              - System-level Android VoiceInteractionService integration.
-              - Select Zara as your default Digital Assistant in Android Settings (long-press Home / swipe from corner launches Zara instantly).
-              - Dedicated 1-tap Assistant setup row in Settings.
-            - **Permanent Wake Word Persistence & Auto-Shutdown Fix**:
-              - Fixed background activation failure: Standby Vosk wake-word listening cleanly re-arms after speech turns.
-              - App-independent wake word: `isWakeWordEnabled` is persistent and never resets when opening app or switching screens.
-              - OEM Autostart & background power management guidance for Vivo, Xiaomi & Samsung.
-            - **Smart Personal Organizer & Utilities Core**:
-              - **Smart Alarm System**: Create, edit, delete, and relative-time alarms hands-free.
-              - **Smart Notes Engine**: Persistent Room database storage (`zara_notes`) with categories, auto-save, search, and voice readback.
-              - **Smart Reminders**: Exact time scheduling via `AlarmManager.setExactAndAllowWhileIdle` with high-priority heads-up notifications.
-              - **Timers & Stopwatch**: Hands-free countdown timers.
-              - **Smart Calendar**: Event scheduling via `CalendarContract`.
-              - **Tasks & To-Dos**: High/Medium/Low priority task tracking.
-              - **Daily Briefing**: Natural spoken daily overview in Tamil, English, and Tanglish.
+            ### What's New in v2.7.0:
+            - **Single-Sentence Wake Word + Command Execution**:
+              - Say wake phrase and command together in one continuous sentence without pausing or waiting for re-prompts:
+                - *"Hey ZARA, Open WhatsApp."*
+                - *"ZARA, Open YouTube."*
+                - *"Hey ZARA, Turn on Flashlight."*
+                - *"ZARA, Take me to Chennai."*
+                - *"WhatsApp open pannu"*, *"YouTube ah open pannu"*.
+              - Thread-safe 3000ms circular PCM AudioRingBuffer preserves post-wake audio context.
+            - **True Hands-Free Background Assistant**:
+              - ZARA operates seamlessly in the background without automatically taking over the screen or popping up MainActivity.
+              - When inside WhatsApp, Chrome, ChatGPT, or on the home screen, commands execute directly in the background.
+              - MainActivity is ONLY brought to the front if the user explicitly says *"Open ZARA"*.
+            - **Immediate Voice Response & Feedback**:
+              - Low-latency voice confirmations via TTS: *"Opening WhatsApp."*, *"Flashlight turned on."*, *"Navigating to Chennai."*
+              - Standalone wake greeting: responds with *"Yes, I'm listening."* immediately when called alone.
+            - **Full Indian Language & Vernacular App Control**:
+              - English, Tamil, Tanglish, Hinglish, and Telugu support for app launching, volume, brightness, and flashlight controls.
+            - **Google Maps Integration**:
+              - Dedicated GoogleMapsManager supporting turn-by-turn navigation (*"Chennai ku vazhi kaatu"*, *"Navigate to airport"*) and nearby place searches (*"Find nearest petrol bunk"*, *"Search nearby restaurants"*).
+              - Native Maps intent targeting with universal browser fallback.
+            - **14-Category Persistent Long-Term Memory (Room SQLite)**:
+              - 14 Structured categories: UserProfile, Preferences, Education, Career, Projects, Goals, Relationships, TechPreferences, Plans, Events, RecurringTasks, Summaries, Corrections, Context.
+              - Automatic background memory extraction from user conversation turns.
+              - Gemini Live tools `manage_memory` and `manage_maps` declared and wired for full conversational memory persistence.
+            - **Voice Barge-In Audio Interruption**:
+              - Immediate TTS and playback cutoff when user speech is detected during voice output.
+            - **System Diagnostics & Telemetry**:
+              - Standardized logging tags implemented across voice, execution, memory, and lifecycle pipelines.
           files: |
             artifacts/Zara-release.apk
             artifacts/Zara-debug.apk

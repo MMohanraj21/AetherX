@@ -12,7 +12,8 @@ class CommandExecutor(
     private val phoneManager: PhoneControlManager,
     private val youtubeManager: YouTubeAutomationManager,
     private val whatsappAssistant: WhatsAppAssistant,
-    private val memoryManager: MemoryManager
+    private val memoryManager: MemoryManager,
+    private val mapsManager: com.jarvis.assistant.automation.maps.GoogleMapsManager? = null
 ) {
     companion object {
         private const val TAG = "CommandExecutor"
@@ -77,6 +78,14 @@ class CommandExecutor(
             is JarvisCommand.RecallFavoriteSong -> memoryManager.getFavoriteSongResponse()
             is JarvisCommand.RecallRoutine -> memoryManager.getRoutineResponse()
             is JarvisCommand.GoToBackground -> "Going to background."
+            is JarvisCommand.MapsNavigate -> {
+                val ok = mapsManager?.navigateTo(command.destination) ?: false
+                if (ok) "Navigating to ${command.destination}." else "Could not open Maps navigation for ${command.destination}."
+            }
+            is JarvisCommand.MapsSearch -> {
+                val ok = mapsManager?.searchNearby(command.query) ?: false
+                if (ok) "Searching for ${command.query} on Maps." else "Could not search ${command.query} on Maps."
+            }
             is JarvisCommand.TypeText -> {
                 val service = com.jarvis.assistant.automation.accessibility.JarvisAccessibilityService.instance
                 if (service != null) {
