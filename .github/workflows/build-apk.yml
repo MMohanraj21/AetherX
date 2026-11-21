@@ -97,10 +97,10 @@ jobs:
         if: github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v4.0.0
-          name: "Zara AI Assistant v4.0.0 — Continuous Conversation, Smart Notifications, Call Control & Unwanted Overlay Removal"
+          tag_name: v4.0.1
+          name: "Zara AI Assistant v4.0.1 — Smart Notification Voice Integration & Incoming Call Assistant"
           body: |
-            ### Zara AI Assistant v4.0.0 (Release Build 400)
+            ### Zara AI Assistant v4.0.1 (Release Build 401)
             Architected, Designed & Developed exclusively by Mohanraj (@Hexvora777).
             Official Connections:
             - Telegram: https://t.me/Hexvora777

@@ -2491,6 +2491,46 @@ class JarvisConversationService : Service() {
                         }
                     }
 
+                    "get_notifications" -> {
+                        val query = args.optString("query", "")
+                        val responseText = com.jarvis.assistant.notification.NotificationContextProvider.formatVoiceResponse(this@JarvisConversationService, query)
+                        val activeItems = com.jarvis.assistant.notification.NotificationRepository.getActiveList()
+                        val listArray = org.json.JSONArray()
+                        for (item in activeItems.take(5)) {
+                            listArray.put(org.json.JSONObject().apply {
+                                put("app", item.appName)
+                                put("sender", item.sender)
+                                put("text", item.text)
+                                put("time", item.formattedTime)
+                                put("can_reply", item.canReply)
+                            })
+                        }
+                        result.put("success", true)
+                        result.put("message", responseText)
+                        result.put("spoken_summary", responseText)
+                        result.put("active_notifications", listArray)
+                    }
+
+                    "reply_to_notification" -> {
+                        val senderQuery = args.optString("sender", "")
+                        val messageBody = args.optString("message", "")
+                        if (messageBody.isBlank()) {
+                            result.put("success", false)
+                            result.put("message", "Reply message text cannot be empty.")
+                        } else {
+                            val matches = if (senderQuery.isNotBlank()) com.jarvis.assistant.notification.NotificationRepository.getBySender(senderQuery) else com.jarvis.assistant.notification.NotificationRepository.getActiveList().filter { it.canReply }
+                            val target = matches.firstOrNull()
+                            if (target != null && target.replyAction != null) {
+                                val ok = com.jarvis.assistant.notification.NotificationReplyManager.sendReply(this@JarvisConversationService, target.replyAction, messageBody)
+                                result.put("success", ok)
+                                result.put("message", if (ok) "Reply sent to ${target.sender}: '$messageBody'" else "Failed to send notification reply.")
+                            } else {
+                                result.put("success", false)
+                                result.put("message", "Could not find a replyable notification matching '$senderQuery'.")
+                            }
+                        }
+                    }
+
 
                     else -> {
                         Log.w("JarvisService", "Unknown toolCall name: $name")

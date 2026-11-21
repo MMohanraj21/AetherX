@@ -44,6 +44,7 @@ class PermissionActivity : AppCompatActivity() {
     private val callLauncher = registerForActivityResult(ActivityResultContracts.RequestPermission()) { updatePermissionStates() }
     private val cameraLauncher = registerForActivityResult(ActivityResultContracts.RequestPermission()) { updatePermissionStates() }
     private val bluetoothLauncher = registerForActivityResult(ActivityResultContracts.RequestPermission()) { updatePermissionStates() }
+    private val callAssistantLauncher = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { updatePermissionStates() }
     private val extraStatus = mutableMapOf<String, TextView>()
     private val extraButtons = mutableMapOf<String, Button>()
 
@@ -124,6 +125,8 @@ class PermissionActivity : AppCompatActivity() {
         updateCardState(hasA11y, binding.tvStatusAccessibility, binding.btnGrantAccessibility)
         updateExtraPermission("contacts", PermissionHelper.hasContactsPermission(this))
         updateExtraPermission("phone", hasPermission(Manifest.permission.CALL_PHONE))
+        updateExtraPermission("incoming_call", PermissionHelper.hasPhoneStatePermission(this) && PermissionHelper.hasAnswerCallsPermission(this))
+        updateExtraPermission("notif_access", PermissionHelper.isNotificationListenerEnabled(this))
         updateExtraPermission("camera", hasPermission(Manifest.permission.CAMERA))
         updateExtraPermission("bluetooth", Build.VERSION.SDK_INT < Build.VERSION_CODES.S || hasPermission(Manifest.permission.BLUETOOTH_CONNECT))
         updateExtraPermission("battery", PermissionHelper.hasBatteryOptimizationPermission(this))
@@ -168,7 +171,11 @@ class PermissionActivity : AppCompatActivity() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && !PermissionHelper.hasNotificationPermission(this)) {
             missing.add(Manifest.permission.POST_NOTIFICATIONS)
         }
-        listOf(Manifest.permission.READ_CONTACTS, Manifest.permission.CALL_PHONE, Manifest.permission.CAMERA).forEach {
+        val extraPerms = mutableListOf(Manifest.permission.READ_CONTACTS, Manifest.permission.CALL_PHONE, Manifest.permission.CAMERA, Manifest.permission.READ_PHONE_STATE, Manifest.permission.READ_CALL_LOG)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            extraPerms.add(Manifest.permission.ANSWER_PHONE_CALLS)
+        }
+        extraPerms.forEach {
             if (!hasPermission(it)) missing.add(it)
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && !hasPermission(Manifest.permission.BLUETOOTH_CONNECT)) {
@@ -226,6 +233,18 @@ class PermissionActivity : AppCompatActivity() {
             section.addView(body)
             extraStatus[key] = status
             extraButtons[key] = button
+        }
+        card("incoming_call", "Call Assistant & Answering", "Allows ZARA to announce incoming caller names and attend or decline calls hands-free.", com.jarvis.assistant.R.drawable.ic_settings_voice) {
+            if (!PermissionHelper.hasPhoneStatePermission(this) || !PermissionHelper.hasAnswerCallsPermission(this)) {
+                val perms = mutableListOf(Manifest.permission.READ_PHONE_STATE, Manifest.permission.READ_CALL_LOG)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    perms.add(Manifest.permission.ANSWER_PHONE_CALLS)
+                }
+                callAssistantLauncher.launch(perms.toTypedArray())
+            } else PermissionHelper.openAppSettings(this)
+        }
+        card("notif_access", "Notification Access", "Enables ZARA to read incoming WhatsApp messages and notifications, and send voice replies.", com.jarvis.assistant.R.drawable.ic_nav_chat) {
+            PermissionHelper.openNotificationListenerSettings(this)
         }
         card("contacts", "Contacts", "Lets WhatsApp and calling features resolve saved contact names.", com.jarvis.assistant.R.drawable.ic_nav_chat) {
             if (!PermissionHelper.hasContactsPermission(this)) contactsLauncher.launch(Manifest.permission.READ_CONTACTS) else PermissionHelper.openAppSettings(this)

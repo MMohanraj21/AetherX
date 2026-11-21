@@ -5,14 +5,15 @@ import android.util.Log
 import com.jarvis.assistant.automation.modes.SmartAutomationEngine
 import com.jarvis.assistant.emergency.EmergencyAssistant
 import com.jarvis.assistant.media.UniversalMediaController
-import com.jarvis.assistant.notification.NotificationIntelligenceManager
+import com.jarvis.assistant.notification.NotificationContextProvider
+import com.jarvis.assistant.notification.NotificationEventManager
 import com.jarvis.assistant.offline.OfflineAIEngine
 import com.jarvis.assistant.offline.OfflineIntentClassifier
 import com.jarvis.assistant.telecom.CallAssistantManager
 
 /**
  * Unified central intelligence orchestrator coordinating device domains, continuous conversation context,
- * offline capabilities, and high-level autonomous tasks.
+ * notifications, telecom actions, and high-level autonomous tasks.
  */
 class ZaraAIOrchestrator(private val context: Context) {
 
@@ -40,8 +41,8 @@ class ZaraAIOrchestrator(private val context: Context) {
      * Returns true if handled directly; returns false if query should stream to Gemini Live.
      */
     fun processVoiceUtterance(utterance: String, onVocalFeedback: (String) -> Unit): Boolean {
-        val hasCall = callManager.incomingCallerName.value != null
-        val hasNotif = NotificationIntelligenceManager.pendingReplySession.value != null
+        val hasCall = callManager.hasActiveRingingCall()
+        val hasNotif = NotificationEventManager.hasPendingReply()
 
         val routed = IntentRouter.route(utterance, hasCall, hasNotif)
         Log.i(TAG, "Query '$utterance' routed to domain: ${routed.domain}")
@@ -51,7 +52,12 @@ class ZaraAIOrchestrator(private val context: Context) {
                 callManager.handleCallVoiceCommand(utterance, onVocalFeedback)
             }
             IntentRouter.TargetDomain.NOTIFICATION_REPLY -> {
-                NotificationIntelligenceManager.handleVoiceConfirmation(context, utterance, onVocalFeedback)
+                NotificationEventManager.handleReplyTurn(context, utterance, onVocalFeedback)
+            }
+            IntentRouter.TargetDomain.NOTIFICATION_QUERY -> {
+                val voiceResponse = NotificationContextProvider.formatVoiceResponse(context, utterance)
+                onVocalFeedback(voiceResponse)
+                true
             }
             IntentRouter.TargetDomain.MEDIA_CONTROL -> {
                 handleMediaVoiceCommand(utterance, onVocalFeedback)
@@ -62,7 +68,7 @@ class ZaraAIOrchestrator(private val context: Context) {
             IntentRouter.TargetDomain.EMERGENCY_SOS -> {
                 emergencyAssistant.handleSosTrigger(
                     onCountdownTick = { sec -> onVocalFeedback("SOS triggered. $sec seconds to cancel.") },
-                    onConfirmed = { msg -> onVocalFeedback("SOS Alert Sent! Location shared.") },
+                    onConfirmed = { _ -> onVocalFeedback("SOS Alert Sent! Location shared.") },
                     onCancelled = { onVocalFeedback("SOS Cancelled.") }
                 )
                 true

@@ -880,6 +880,41 @@ class GeminiLiveWebSocket(
                             })
                         })
 
+                        // 31. get_notifications
+                        put(JSONObject().apply {
+                            put("name", "get_notifications")
+                            put("description", "Fetches active device notifications, messages, and alerts received on the phone from apps like WhatsApp, Telegram, Gmail, SMS, etc. Call whenever the user asks: 'what notifications did I receive?', 'any new messages?', 'did someone message me?', 'who messaged me?', 'read my notifications', 'whatsapp la message vandhurukka?'.")
+                            put("parameters", JSONObject().apply {
+                                put("type", "OBJECT")
+                                put("properties", JSONObject().apply {
+                                    put("query", JSONObject().apply {
+                                        put("type", "STRING")
+                                        put("description", "Optional search term, app name (e.g. 'WhatsApp'), or sender name to filter notifications.")
+                                    })
+                                })
+                            })
+                        })
+
+                        // 32. reply_to_notification
+                        put(JSONObject().apply {
+                            put("name", "reply_to_notification")
+                            put("description", "Sends an immediate reply to an active notification (e.g. WhatsApp, Telegram, SMS) via Android RemoteInput. Call when the user specifies or confirms their reply text.")
+                            put("parameters", JSONObject().apply {
+                                put("type", "OBJECT")
+                                put("properties", JSONObject().apply {
+                                    put("sender", JSONObject().apply {
+                                        put("type", "STRING")
+                                        put("description", "The sender name or app to reply to.")
+                                    })
+                                    put("message", JSONObject().apply {
+                                        put("type", "STRING")
+                                        put("description", "The confirmed reply text to send.")
+                                    })
+                                })
+                                put("required", JSONArray().put("message"))
+                            })
+                        })
+
 
 
                     })

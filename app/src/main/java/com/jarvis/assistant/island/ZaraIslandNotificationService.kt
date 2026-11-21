@@ -52,6 +52,12 @@ class ZaraIslandNotificationService : NotificationListenerService() {
         isConnected = true
         Log.i(TAG, "ZaraIslandNotificationService connected")
         initMediaSessionTracking()
+        try {
+            val active = getActiveNotifications()
+            com.jarvis.assistant.notification.NotificationRepository.syncActiveNotifications(this, active)
+        } catch (e: Exception) {
+            Log.w(TAG, "Could not sync active notifications on connect: ${e.message}")
+        }
     }
 
     override fun onListenerDisconnected() {
@@ -106,12 +112,18 @@ class ZaraIslandNotificationService : NotificationListenerService() {
 
         ZaraIslandManager.getInstance(this).postNotification(islandNotif)
 
-        // ZARA AI v4.0 Smart Notification Intelligence
-        com.jarvis.assistant.notification.NotificationIntelligenceManager.onNotificationReceived(this, sbn)
+        // ZARA AI v4.0 Smart Notification Intelligence & Voice Integration
+        com.jarvis.assistant.notification.NotificationEventManager.onNotificationPosted(this, sbn)
     }
 
     override fun onNotificationRemoved(sbn: StatusBarNotification?) {
-        // Handled via auto-dismiss in ZaraIslandManager
+        sbn?.key?.let {
+            com.jarvis.assistant.notification.NotificationEventManager.onNotificationRemoved(it)
+        }
+    }
+
+    override fun onNotificationRankingUpdate(rankingMap: RankingMap?) {
+        super.onNotificationRankingUpdate(rankingMap)
     }
 
     private fun initMediaSessionTracking() {
