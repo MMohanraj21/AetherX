@@ -1168,6 +1168,45 @@ class JarvisConversationService : Service() {
                             val userUtterance = currentTurnUserText.toString().trim()
                             if (userUtterance.isNotEmpty()) {
                                 app.memoryManager.learnPreferencesFromConversation(userUtterance)
+
+                                // Check MessageExecutionGate pending confirmation
+                                if (com.jarvis.assistant.security.MessageExecutionGate.hasPendingConfirmation()) {
+                                    val gateResult = com.jarvis.assistant.security.MessageExecutionGate.handleUserVoiceTurn(userUtterance)
+                                    when (gateResult) {
+                                        is com.jarvis.assistant.security.MessageExecutionGate.GateResult.Authorized -> {
+                                            val draft = gateResult.draft
+                                            when (draft.appType) {
+                                                "WHATSAPP" -> {
+                                                    com.jarvis.assistant.util.WhatsAppMessenger.sendMessage(this@JarvisConversationService, draft.recipient, draft.exactContent, 1, confirmed = true)
+                                                    speakImmediateVoiceResponse("Your message to ${draft.recipient} was submitted successfully.")
+                                                }
+                                                "NOTIFICATION_REPLY" -> {
+                                                    val notifAction = (draft.replyAction as? com.jarvis.assistant.notification.NotificationReplyManager.ReplyableAction)
+                                                    if (notifAction != null) {
+                                                        val ok = com.jarvis.assistant.notification.NotificationReplyManager.sendReply(this@JarvisConversationService, notifAction, draft.exactContent)
+                                                        speakImmediateVoiceResponse(if (ok) "Your reply was submitted successfully." else "Could not submit reply.")
+                                                    }
+                                                }
+                                            }
+                                            return
+                                        }
+                                        is com.jarvis.assistant.security.MessageExecutionGate.GateResult.Cancelled -> {
+                                            speakImmediateVoiceResponse("Cancelled. I haven't sent anything.")
+                                            return
+                                        }
+                                        is com.jarvis.assistant.security.MessageExecutionGate.GateResult.Expired -> {
+                                            speakImmediateVoiceResponse("Confirmation timed out. The message was not sent.")
+                                            return
+                                        }
+                                        is com.jarvis.assistant.security.MessageExecutionGate.GateResult.AwaitingConfirmation -> {
+                                            speakImmediateVoiceResponse(gateResult.spokenPrompt) {
+                                                com.jarvis.assistant.island.OriginIslandController.startListening(this@JarvisConversationService)
+                                            }
+                                            return
+                                        }
+                                        else -> {}
+                                    }
+                                }
                             }
                             val assistantText = currentTurnAssistantText.toString().lowercase(Locale.ROOT)
                             val isConfused = assistantText.contains("not understand") ||
@@ -2033,9 +2072,29 @@ class JarvisConversationService : Service() {
                         val recipient = args.optString("recipient_name", "").trim()
                         val message = args.optString("message", "").trim()
                         val appNumber = if (args.has("app_number")) args.optInt("app_number", 1) else null
-                        val confirmed = args.optBoolean("confirmed", true)
+
+                        // Strict MessageExecutionGate Check
+                        val hasGateApproval = com.jarvis.assistant.security.MessageExecutionGate.hasPendingConfirmation() &&
+                                com.jarvis.assistant.security.MessageExecutionGate.activeDraft.value?.isAuthorized == true
+
+                        if (!hasGateApproval) {
+                            val staging = com.jarvis.assistant.security.MessageExecutionGate.stageDraft(
+                                appType = "WHATSAPP",
+                                recipient = recipient,
+                                exactContent = message
+                            )
+                            result.put("success", false)
+                            result.put("requires_confirmation", true)
+                            result.put("spoken_prompt", staging.spokenPrompt)
+                            result.put("message", staging.spokenPrompt)
+                            speakImmediateVoiceResponse(staging.spokenPrompt) {
+                                com.jarvis.assistant.island.OriginIslandController.startListening(this@JarvisConversationService)
+                            }
+                            return@withTimeout
+                        }
+
                         audioPlayer?.flush()
-                        val waResult = com.jarvis.assistant.util.WhatsAppMessenger.sendMessage(this@JarvisConversationService, recipient, message, appNumber, confirmed)
+                        val waResult = com.jarvis.assistant.util.WhatsAppMessenger.sendMessage(this@JarvisConversationService, recipient, message, appNumber, confirmed = true)
                         when (waResult) {
                             is com.jarvis.assistant.util.WhatsAppMessenger.SendResult.Success -> {
                                 result.put("success", true) // WhatsApp opened and the send action was queued.
@@ -2521,6 +2580,26 @@ class JarvisConversationService : Service() {
                             val matches = if (senderQuery.isNotBlank()) com.jarvis.assistant.notification.NotificationRepository.getBySender(senderQuery) else com.jarvis.assistant.notification.NotificationRepository.getActiveList().filter { it.canReply }
                             val target = matches.firstOrNull()
                             if (target != null && target.replyAction != null) {
+                                val hasGateApproval = com.jarvis.assistant.security.MessageExecutionGate.hasPendingConfirmation() &&
+                                        com.jarvis.assistant.security.MessageExecutionGate.activeDraft.value?.isAuthorized == true
+
+                                if (!hasGateApproval) {
+                                    val staging = com.jarvis.assistant.security.MessageExecutionGate.stageDraft(
+                                        appType = "NOTIFICATION_REPLY",
+                                        recipient = target.sender,
+                                        exactContent = messageBody,
+                                        replyAction = target.replyAction
+                                    )
+                                    result.put("success", false)
+                                    result.put("requires_confirmation", true)
+                                    result.put("spoken_prompt", staging.spokenPrompt)
+                                    result.put("message", staging.spokenPrompt)
+                                    speakImmediateVoiceResponse(staging.spokenPrompt) {
+                                        com.jarvis.assistant.island.OriginIslandController.startListening(this@JarvisConversationService)
+                                    }
+                                    return@withTimeout
+                                }
+
                                 val ok = com.jarvis.assistant.notification.NotificationReplyManager.sendReply(this@JarvisConversationService, target.replyAction, messageBody)
                                 result.put("success", ok)
                                 result.put("message", if (ok) "Reply sent to ${target.sender}: '$messageBody'" else "Failed to send notification reply.")
@@ -2981,19 +3060,8 @@ class JarvisConversationService : Service() {
             matchSource = "ASSISTANT_WHATSAPP_DELETE"
         }
 
-        // --- 6. WhatsApp Message: "Sending WhatsApp message to [Contact]: [Message]" ---
-        else if (clean.startsWith("sending whatsapp message to ") || clean.startsWith("sending message to ")) {
-            val waMatch = Regex("^(?:sending\\s+whatsapp\\s+message\\s+to\\s+|sending\\s+message\\s+to\\s+)([a-zA-Z0-9\\s]+?):\\s*(.+)$", RegexOption.IGNORE_CASE).find(rawClean)
-            if (waMatch != null) {
-                val contact = waMatch.groupValues[1].trim()
-                val message = waMatch.groupValues[2].trim()
-                if (contact.isNotBlank() && message.isNotBlank()) {
-                    command = com.jarvis.assistant.automation.command.JarvisCommand.WhatsAppMessage(contact, message)
-                    matchSource = "ASSISTANT_WHATSAPP_SEND"
-                }
-            }
-        }
-
+        // --- 6. WhatsApp Message Auto-Send Removed in v4.5 for Strict Security Gate compliance ---
+        // Messages can ONLY be dispatched through explicit verbal user confirmation via MessageExecutionGate.
         // --- 7. Website Navigation: "Opening [url] in browser", "Opening website [url]" ---
         else if (clean.startsWith("opening ") && (clean.contains("in browser") || clean.contains("in chrome") || clean.contains("website") || clean.contains(".com") || clean.contains(".org") || clean.contains(".dev") || clean.contains(".in") || clean.contains(".net") || clean.contains(".io"))) {
             val urlMatch = Regex("^(?:opening\\s+website\\s+|opening\\s+)(.+?)(?:\\s+in\\s+browser|\\s+in\\s+chrome|\\s+website)?$").find(clean)

@@ -114,12 +114,15 @@ class WhatsAppAssistant(
         if (cleanContact.isBlank()) return "Who would you like to message on WhatsApp, sir?"
         if (cleanMessage.isBlank()) return "What message would you like to send to $cleanContact?"
 
+        // Security Gate: Always create draft and await explicit user confirmation!
         val draftResult = createDraft(cleanContact, cleanMessage)
-        return if (hasPendingDraft()) {
-            confirmAndSend()
-        } else {
-            draftResult
-        }
+        com.jarvis.assistant.security.MessageExecutionGate.stageDraft(
+            appType = "WHATSAPP",
+            recipient = cleanContact,
+            phoneNumber = pendingDraft?.phoneNumber,
+            exactContent = cleanMessage
+        )
+        return draftResult
     }
 
     fun confirmAndSend(): String {

@@ -3,17 +3,19 @@ package com.jarvis.assistant.orchestrator
 import android.content.Context
 import android.util.Log
 import com.jarvis.assistant.automation.modes.SmartAutomationEngine
+import com.jarvis.assistant.conversation.ConversationalReasoningEngine
 import com.jarvis.assistant.emergency.EmergencyAssistant
 import com.jarvis.assistant.media.UniversalMediaController
 import com.jarvis.assistant.notification.NotificationContextProvider
 import com.jarvis.assistant.notification.NotificationEventManager
 import com.jarvis.assistant.offline.OfflineAIEngine
 import com.jarvis.assistant.offline.OfflineIntentClassifier
+import com.jarvis.assistant.security.MessageExecutionGate
 import com.jarvis.assistant.telecom.CallAssistantManager
 
 /**
  * Unified central intelligence orchestrator coordinating device domains, continuous conversation context,
- * notifications, telecom actions, and high-level autonomous tasks.
+ * notifications, telecom actions, conversational reasoning, and high-level autonomous tasks.
  */
 class ZaraAIOrchestrator(private val context: Context) {
 
@@ -35,35 +37,74 @@ class ZaraAIOrchestrator(private val context: Context) {
     private val mediaController = UniversalMediaController(context)
     private val automationEngine = SmartAutomationEngine(context)
     private val emergencyAssistant = EmergencyAssistant(context)
+    private val reasoningEngine = ConversationalReasoningEngine.getInstance(context)
 
     /**
      * Attempts to resolve and execute intent through specialized local domains first.
      * Returns true if handled directly; returns false if query should stream to Gemini Live.
      */
     fun processVoiceUtterance(utterance: String, onVocalFeedback: (String) -> Unit): Boolean {
+        // Priority 1: Strict MessageExecutionGate Confirmation / Cancellation
+        if (MessageExecutionGate.hasPendingConfirmation()) {
+            val gateResult = MessageExecutionGate.handleUserVoiceTurn(utterance)
+            return when (gateResult) {
+                is MessageExecutionGate.GateResult.Authorized -> {
+                    val draft = gateResult.draft
+                    when (draft.appType) {
+                        "WHATSAPP" -> {
+                            com.jarvis.assistant.util.WhatsAppMessenger.sendMessage(context, draft.recipient, draft.exactContent, 1, confirmed = true)
+                            onVocalFeedback("Your message to ${draft.recipient} was submitted successfully.")
+                        }
+                        "NOTIFICATION_REPLY" -> {
+                            val notifAction = (draft.replyAction as? com.jarvis.assistant.notification.NotificationReplyManager.ReplyableAction)
+                            if (notifAction != null) {
+                                val ok = com.jarvis.assistant.notification.NotificationReplyManager.sendReply(context, notifAction, draft.exactContent)
+                                onVocalFeedback(if (ok) "Your reply was submitted successfully." else "Could not submit reply.")
+                            }
+                        }
+                    }
+                    true
+                }
+                is MessageExecutionGate.GateResult.Cancelled -> {
+                    onVocalFeedback("Cancelled. I haven't sent anything.")
+                    true
+                }
+                is MessageExecutionGate.GateResult.Expired -> {
+                    onVocalFeedback("Confirmation timed out. The message was not sent.")
+                    true
+                }
+                is MessageExecutionGate.GateResult.AwaitingConfirmation -> {
+                    onVocalFeedback(gateResult.spokenPrompt)
+                    true
+                }
+                else -> false
+            }
+        }
+
+        // Priority 2: Incoming Call priority
         val hasCall = callManager.hasActiveRingingCall()
         val hasNotif = NotificationEventManager.hasPendingReply()
 
         val routed = IntentRouter.route(utterance, hasCall, hasNotif)
         Log.i(TAG, "Query '$utterance' routed to domain: ${routed.domain}")
 
-        return when (routed.domain) {
+        when (routed.domain) {
             IntentRouter.TargetDomain.TELECOM_CALL -> {
-                callManager.handleCallVoiceCommand(utterance, onVocalFeedback)
+                return callManager.handleCallVoiceCommand(utterance, onVocalFeedback)
             }
             IntentRouter.TargetDomain.NOTIFICATION_REPLY -> {
-                NotificationEventManager.handleReplyTurn(context, utterance, onVocalFeedback)
+                return NotificationEventManager.handleReplyTurn(context, utterance, onVocalFeedback)
             }
             IntentRouter.TargetDomain.NOTIFICATION_QUERY -> {
                 val voiceResponse = NotificationContextProvider.formatVoiceResponse(context, utterance)
                 onVocalFeedback(voiceResponse)
-                true
+                return true
             }
             IntentRouter.TargetDomain.MEDIA_CONTROL -> {
-                handleMediaVoiceCommand(utterance, onVocalFeedback)
+                return handleMediaVoiceCommand(utterance, onVocalFeedback)
             }
             IntentRouter.TargetDomain.AUTOMATION_ROUTINE -> {
-                handleAutomationVoiceCommand(utterance, onVocalFeedback)
+                return handleAutomationVoiceCommand(utterance, onVocalFeedback)
             }
             IntentRouter.TargetDomain.EMERGENCY_SOS -> {
                 emergencyAssistant.handleSosTrigger(
@@ -71,19 +112,37 @@ class ZaraAIOrchestrator(private val context: Context) {
                     onConfirmed = { _ -> onVocalFeedback("SOS Alert Sent! Location shared.") },
                     onCancelled = { onVocalFeedback("SOS Cancelled.") }
                 )
-                true
+                return true
             }
             IntentRouter.TargetDomain.OFFLINE_DEVICE -> {
                 val classified = OfflineIntentClassifier.classify(utterance)
                 if (classified != null) {
-                    offlineEngine.executeLocally(classified, onVocalFeedback)
-                } else {
-                    false
+                    return offlineEngine.executeLocally(classified, onVocalFeedback)
                 }
             }
-            IntentRouter.TargetDomain.GENERATIVE_AI -> {
-                // Stream to Gemini Live Bidirectional WebSocket
-                false
+            IntentRouter.TargetDomain.GENERATIVE_AI -> {}
+        }
+
+        // Priority 3: Conversational Reasoning Engine (Clarification & Multi-turn evaluation)
+        val reasoning = reasoningEngine.evaluate(utterance)
+        when (reasoning) {
+            is ConversationalReasoningEngine.ReasoningResult.SpeakClarification -> {
+                onVocalFeedback(reasoning.question)
+                return true
+            }
+            is ConversationalReasoningEngine.ReasoningResult.SpeakConfirmation -> {
+                onVocalFeedback(reasoning.prompt)
+                return true
+            }
+            is ConversationalReasoningEngine.ReasoningResult.HandledLocally -> {
+                onVocalFeedback(reasoning.feedback)
+                return true
+            }
+            is ConversationalReasoningEngine.ReasoningResult.ExecuteDirectly -> {
+                return false
+            }
+            is ConversationalReasoningEngine.ReasoningResult.DelegateToGemini -> {
+                return false
             }
         }
     }
