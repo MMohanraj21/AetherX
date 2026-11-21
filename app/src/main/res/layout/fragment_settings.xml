@@ -778,7 +778,7 @@
                             android:layout_width="22dp"
                             android:layout_height="22dp"
                             android:layout_gravity="center"
-                            android:src="@drawable/ic_dock_mic"
+                            android:src="@drawable/ic_settings_voice"
                             app:tint="?attr/themeAccent"
                             android:contentDescription="Diagnostics" />
                     </FrameLayout>
