@@ -117,23 +117,23 @@ object QueryUnderstandingEngine {
     }
 
     private fun normalize(raw: String): String {
-        val wakeRegex = Regex("(?i)^(?:hey|hi|hello|ok|okay|wake\s+up|listen)?\s*(?:zara|sara|zahra|xara)[,\s]*")
+        val wakeRegex = Regex("""(?i)^(?:hey|hi|hello|ok|okay|wake\s+up|listen)?\s*(?:zara|sara|zahra|xara)[,\s]*""")
         return raw.replace(wakeRegex, "").trim().trimEnd('.', '!', '?', ',')
     }
 
     private fun detectLanguage(text: String): DetectedLanguage {
         val lower = text.lowercase()
-        // Tamil unicode range
-        val hasTamilChars = text.any { it in '஀'..'௿' }
+        // Tamil unicode block (0x0B80 - 0x0BFF)
+        val hasTamilChars = text.any { it.code in 0x0B80..0x0BFF }
         if (hasTamilChars) return DetectedLanguage.TAMIL
 
         // Tanglish heuristics
         val tanglishWords = setOf("ku", "anuppu", "pannu", "edunga", "vandhurukka", "irukka", "enna", "sari", "aama", "vendaam", "soller", "pesu")
-        val words = lower.split(Regex("\s+"))
+        val words = lower.split(Regex("""\s+"""))
         if (words.any { it in tanglishWords }) return DetectedLanguage.TANGLISH
 
-        // Hindi heuristics
-        val hasDevanagari = text.any { it in 'ऀ'..'ॿ' }
+        // Devanagari unicode block (0x0900 - 0x097F)
+        val hasDevanagari = text.any { it.code in 0x0900..0x097F }
         if (hasDevanagari) return DetectedLanguage.HINDI
 
         val hinglishWords = setOf("bhai", "karo", "kardo", "kaise", "kya", "batao", "bhejo", "chalao")
@@ -186,12 +186,12 @@ object QueryUnderstandingEngine {
     }
 
     private fun extractContact(lower: String): String? {
-        val match = Regex("(?:to|call|message|for)\s+([a-zA-Z]+)").find(lower)
+        val match = Regex("""(?:to|call|message|for)\s+([a-zA-Z]+)""").find(lower)
         return match?.groupValues?.getOrNull(1)?.takeIf { it !in listOf("me", "a", "the", "my", "someone", "him", "her") }
     }
 
     private fun extractMessage(lower: String): String? {
-        val match = Regex("(?:saying|tell him|tell her|that)\s+(.+)").find(lower)
+        val match = Regex("""(?:saying|tell him|tell her|that)\s+(.+)""").find(lower)
         return match?.groupValues?.getOrNull(1)?.trim()
     }
 }

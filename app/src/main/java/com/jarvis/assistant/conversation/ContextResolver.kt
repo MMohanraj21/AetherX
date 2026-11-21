@@ -26,7 +26,7 @@ object ContextResolver {
 
     fun resolveQueryContext(rawQuery: String): ResolvedQuery {
         val lower = rawQuery.lowercase().trim()
-        val words = lower.split(Regex("\s+"))
+        val words = lower.split(Regex("""\s+"""))
         var resolvedText = rawQuery
         val substitutions = mutableListOf<String>()
 
@@ -34,7 +34,7 @@ object ContextResolver {
         val personEntity = ConversationStateManager.getLatestEntity(ConversationStateManager.EntityType.PERSON_CONTACT)
         if (personEntity != null) {
             for (p in PERSON_PRONOUNS) {
-                val regex = Regex("\b$p\b", RegexOption.IGNORE_CASE)
+                val regex = Regex("""\b""" + Regex.escape(p) + """\b""", RegexOption.IGNORE_CASE)
                 if (regex.containsMatchIn(resolvedText)) {
                     resolvedText = regex.replace(resolvedText, personEntity.value)
                     substitutions.add("$p -> ${personEntity.value}")
@@ -46,7 +46,7 @@ object ContextResolver {
         val appEntity = ConversationStateManager.getLatestEntity(ConversationStateManager.EntityType.APPLICATION)
         if (appEntity != null) {
             for (p in APP_PRONOUNS) {
-                val regex = Regex("\b$p\b", RegexOption.IGNORE_CASE)
+                val regex = Regex("""\b""" + Regex.escape(p) + """\b""", RegexOption.IGNORE_CASE)
                 if (regex.containsMatchIn(resolvedText)) {
                     resolvedText = regex.replace(resolvedText, appEntity.value)
                     substitutions.add("$p -> ${appEntity.value}")
@@ -58,7 +58,7 @@ object ContextResolver {
         val fileEntity = ConversationStateManager.getLatestEntity(ConversationStateManager.EntityType.FILE)
         if (fileEntity != null) {
             for (p in FILE_PRONOUNS) {
-                val regex = Regex("\b$p\b", RegexOption.IGNORE_CASE)
+                val regex = Regex("""\b""" + Regex.escape(p) + """\b""", RegexOption.IGNORE_CASE)
                 if (regex.containsMatchIn(resolvedText)) {
                     resolvedText = regex.replace(resolvedText, fileEntity.value)
                     substitutions.add("$p -> ${fileEntity.value}")
