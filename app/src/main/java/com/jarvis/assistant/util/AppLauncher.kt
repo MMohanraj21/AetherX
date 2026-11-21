@@ -115,21 +115,50 @@ object AppLauncher {
         "pubg mobile" to listOf("bgmi", "pubg mobile", "pubg"),
         "free fire" to listOf("free fire max", "free fire"),
         "ff" to listOf("free fire max", "free fire"),
-        "insta" to listOf("instagram"),
+        "instagram" to listOf("instagram", "insta"),
+        "insta" to listOf("instagram", "insta"),
         "whats app" to listOf("whatsapp"),
+        "whatsapp" to listOf("whatsapp", "whats app"),
         "snap chat" to listOf("snapchat"),
         "snap" to listOf("snapchat"),
         "fb" to listOf("facebook"),
+        "facebook" to listOf("facebook", "fb"),
         "yt" to listOf("youtube"),
-        "photos" to listOf("photos", "google photos"),
+        "youtube" to listOf("youtube", "yt"),
+        "spotify" to listOf("spotify"),
+        "settings" to listOf("settings", "setting"),
+        "setting" to listOf("settings", "setting"),
+        "camera" to listOf("camera", "cam"),
+        "gallery" to listOf("gallery", "photos", "google photos", "albums"),
+        "photos" to listOf("photos", "google photos", "gallery"),
         "google photos" to listOf("photos", "google photos"),
         "google photo" to listOf("photos", "google photos"),
         "photo" to listOf("photos", "google photos"),
-        "chatgpt" to listOf("chatgpt", "chat gpt"),
-        "chat gpt" to listOf("chatgpt", "chat gpt"),
+        "chatgpt" to listOf("chatgpt", "chat gpt", "openai"),
+        "chat gpt" to listOf("chatgpt", "chat gpt", "openai"),
+        "openai" to listOf("chatgpt", "chat gpt"),
+        "chrome" to listOf("chrome", "google chrome"),
+        "google chrome" to listOf("chrome", "google chrome"),
         "gemini" to listOf("gemini", "google gemini"),
         "google gemini" to listOf("gemini", "google gemini"),
         "bard" to listOf("gemini", "google gemini")
+    )
+
+    private val DIRECT_PACKAGES: Map<String, String> = mapOf(
+        "instagram" to "com.instagram.android",
+        "insta" to "com.instagram.android",
+        "chatgpt" to "com.openai.chatgpt",
+        "chat gpt" to "com.openai.chatgpt",
+        "openai" to "com.openai.chatgpt",
+        "whatsapp" to "com.whatsapp",
+        "whats app" to "com.whatsapp",
+        "youtube" to "com.google.android.youtube",
+        "yt" to "com.google.android.youtube",
+        "spotify" to "com.spotify.music",
+        "chrome" to "com.android.chrome",
+        "google chrome" to "com.android.chrome",
+        "settings" to "com.android.settings",
+        "telegram" to "org.telegram.messenger"
     )
 
     /**
@@ -146,6 +175,28 @@ object AppLauncher {
             .ifEmpty { rawQuery }
 
         val apps = getLaunchableApps(context)
+
+        // 1. Direct package match if known popular app is installed
+        DIRECT_PACKAGES[cleanQuery]?.let { targetPkg ->
+            val pkgHit = apps.filter { it.packageName.equals(targetPkg, ignoreCase = true) }
+            if (pkgHit.isNotEmpty()) return pkgHit
+
+            // Also check directly via PackageManager in case LauncherApps was restrictive
+            try {
+                val launchIntent = context.packageManager.getLaunchIntentForPackage(targetPkg)
+                if (launchIntent != null) {
+                    val appInfo = context.packageManager.getApplicationInfo(targetPkg, 0)
+                    val label = context.packageManager.getApplicationLabel(appInfo).toString()
+                    return listOf(
+                        InstalledApp(
+                            label = label,
+                            packageName = targetPkg,
+                            componentName = launchIntent.component
+                        )
+                    )
+                }
+            } catch (_: Exception) {}
+        }
 
         SPOKEN_ALIASES[cleanQuery]?.let { candidates ->
             for (candidate in candidates) {
@@ -221,6 +272,50 @@ object AppLauncher {
      * Attempts to open an app based on [spokenName] and optional [appNumber] (1 or 2).
      */
     fun openAppResult(context: Context, spokenName: String, appNumber: Int? = null): OpenAppResult {
+        val clean = spokenName.trim().lowercase()
+
+        // 0. Direct system intent fallbacks for core Android utilities
+        if (clean == "settings" || clean == "setting") {
+            return try {
+                val intent = Intent(android.provider.Settings.ACTION_SETTINGS).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                ActivityLauncherHelper.startActivitySafely(context, intent)
+                OpenAppResult.Success(InstalledApp("Settings", "com.android.settings"))
+            } catch (_: Exception) {
+                OpenAppResult.Failure
+            }
+        }
+        if (clean == "camera" || clean == "cam") {
+            return try {
+                val intent = Intent(android.provider.MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                ActivityLauncherHelper.startActivitySafely(context, intent)
+                OpenAppResult.Success(InstalledApp("Camera", "com.android.camera"))
+            } catch (_: Exception) {
+                OpenAppResult.Failure
+            }
+        }
+        if (clean == "gallery" || clean == "photos" || clean == "photo gallery" || clean == "albums") {
+            val photosPkg = "com.google.android.apps.photos"
+            val launchIntent = context.packageManager.getLaunchIntentForPackage(photosPkg)
+            if (launchIntent != null) {
+                ActivityLauncherHelper.startActivitySafely(context, launchIntent)
+                return OpenAppResult.Success(InstalledApp("Photos", photosPkg))
+            }
+            return try {
+                val intent = Intent(Intent.ACTION_VIEW).apply {
+                    type = "image/*"
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                ActivityLauncherHelper.startActivitySafely(context, intent)
+                OpenAppResult.Success(InstalledApp("Gallery", "android.media.gallery"))
+            } catch (_: Exception) {
+                OpenAppResult.Failure
+            }
+        }
+
         val matches = findMatchingApps(context, spokenName)
         if (matches.isEmpty()) return OpenAppResult.NotFound(spokenName)
 

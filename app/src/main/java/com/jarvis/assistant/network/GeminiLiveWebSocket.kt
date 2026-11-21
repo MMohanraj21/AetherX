@@ -164,6 +164,12 @@ class GeminiLiveWebSocket(
                     isSetupComplete.set(false)
                     stopTimers()
 
+                    val isNetworkError = t is java.net.UnknownHostException || t is java.net.SocketTimeoutException ||
+                            t is java.net.ConnectException || t is java.net.NoRouteToHostException ||
+                            errorMsg.contains("Unable to resolve host", ignoreCase = true) ||
+                            errorMsg.contains("Failed to connect", ignoreCase = true) ||
+                            errorMsg.contains("timeout", ignoreCase = true)
+
                     val isApiKeyError = code == 400 || code == 401 || code == 403 ||
                             errorMsg.contains("400") || errorMsg.contains("403") || errorMsg.contains("401") ||
                             errorMsg.contains("API_KEY_INVALID", ignoreCase = true) ||
@@ -177,16 +183,36 @@ class GeminiLiveWebSocket(
                             errorMsg.contains("quota", ignoreCase = true) ||
                             (responseBody?.contains("RESOURCE_EXHAUSTED", ignoreCase = true) == true)
 
+                    val isServerError = code in 500..599 || errorMsg.contains("503") ||
+                            errorMsg.contains("502") || errorMsg.contains("500")
+
+                    if (isNetworkError) {
+                        Log.w(TAG, "Network failure: Internet unavailable ($errorMsg)")
+                        listener.onError("Internet unavailable. Please check your Wi-Fi or mobile data.", isFatal = false, errorCode = "NETWORK_UNAVAILABLE")
+                        listener.onConnectionStateChanged("OFFLINE • NO INTERNET")
+                        scheduleReconnect()
+                        return
+                    }
+
                     if (isApiKeyError) {
-                        Log.e(TAG, "Fatal failure: Invalid API Key (HTTP $code: $errorMsg)")
-                        listener.onError("Invalid API Key: Google rejected the key. Please verify your Gemini API key in Settings.", isFatal = true, errorCode = "API_KEY_INVALID")
+                        Log.e(TAG, "Fatal failure: AI authentication failed (HTTP $code: $errorMsg)")
+                        listener.onError("AI authentication failed. Please verify your Gemini API key in Settings.", isFatal = true, errorCode = "API_KEY_INVALID")
                         listener.onConnectionStateChanged("ERROR • INVALID KEY")
                         return
                     }
 
                     if (isQuotaError) {
-                        Log.w(TAG, "Quota / rate limit hit (HTTP $code: $errorMsg). Retrying in cooldown...")
+                        Log.w(TAG, "API quota exceeded (HTTP $code: $errorMsg). Retrying in cooldown...")
+                        listener.onError("API quota exceeded. Please check your Gemini API plan or try again later.", isFatal = false, errorCode = "QUOTA_EXCEEDED")
                         listener.onConnectionStateChanged("COOLDOWN • RETRYING")
+                        scheduleReconnect()
+                        return
+                    }
+
+                    if (isServerError) {
+                        Log.w(TAG, "AI server unavailable (HTTP $code: $errorMsg). Retrying...")
+                        listener.onError("AI server unavailable. Google Gemini Live is temporarily unreachable.", isFatal = false, errorCode = "SERVER_UNAVAILABLE")
+                        listener.onConnectionStateChanged("ERROR • SERVER DOWN")
                         scheduleReconnect()
                         return
                     }
@@ -1169,17 +1195,31 @@ class GeminiLiveWebSocket(
     }
 
     /**
-     * Signals locally detected end-of-speech to Gemini Live so it immediately begins
-     * generating response audio without waiting for server-side silence timeouts.
+     * Signals locally detected end-of-speech to Gemini Live using official BidiGenerateContent activityEnd
+     * so it immediately begins generating response audio without waiting for server-side silence timeouts.
      */
     fun sendAudioStreamEnd() {
         if (!isConnected.get() || !isSetupComplete.get()) return
         try {
-            val json = "{\"realtimeInput\":{\"audioStreamEnd\":true}}"
+            val json = "{\"realtimeInput\":{\"activityEnd\":{}}}"
             webSocket?.send(json)
-            Log.d(TAG, "Sent audioStreamEnd signal to Gemini Live")
+            Log.d(TAG, "Sent activityEnd signal to Gemini Live")
         } catch (e: Exception) {
             Log.w(TAG, "sendAudioStreamEnd error: ${e.message}")
+        }
+    }
+
+    /**
+     * Notifies Gemini Live that user speech/activity has begun.
+     */
+    fun sendActivityStart() {
+        if (!isConnected.get() || !isSetupComplete.get()) return
+        try {
+            val json = "{\"realtimeInput\":{\"activityStart\":{}}}"
+            webSocket?.send(json)
+            Log.d(TAG, "Sent activityStart signal to Gemini Live")
+        } catch (e: Exception) {
+            Log.w(TAG, "sendActivityStart error: ${e.message}")
         }
     }
 

@@ -464,15 +464,16 @@ object CommandParser {
         }
 
         // Phonetic Domain / Spoken tech websites: "open wersel", "open varsel", "open vercel", "open 21st dev", "open website vercel", "open flipkart website"
+        // Must contain explicit web keywords (website, site, in browser, in chrome) or a dot TLD, never hijack native apps!
         if (cleanForDomain.startsWith("open ") || cleanForDomain.startsWith("launch ") || cleanForDomain.startsWith("go to ") || cleanForDomain.startsWith("browse ")) {
             val target = cleanForDomain.replace(Regex("(?i)^(open|launch|go to|browse)\\s+(the\\s+)?"), "")
                 .replace(Regex("(?i)^(the\\s+)?(website|site|web)\\s+"), "")
                 .replace(Regex("(?i)\\s+(website|site|web|in browser|in chrome)$"), "")
                 .trim()
-            val isExplicitWeb = cleanForDomain.contains("website") || cleanForDomain.contains("site") ||
+            val hasExplicitWebKeyword = cleanForDomain.contains("website") || cleanForDomain.contains("site") ||
                     cleanForDomain.contains("in browser") || cleanForDomain.contains("in chrome") ||
-                    DomainNormalizer.isKnownWebAlias(target)
-            if (isExplicitWeb && target.isNotBlank()) {
+                    (target.contains(".") && !target.contains(" "))
+            if (hasExplicitWebKeyword && target.isNotBlank() && DomainNormalizer.isKnownWebAlias(target)) {
                 val normalizedUrl = DomainNormalizer.normalizeToUrl(target)
                 return ParsedCommandResult(JarvisCommand.OpenWebUrls(listOf(normalizedUrl)), 0.97f, "WEB_KNOWN_ALIAS")
             }
@@ -549,7 +550,7 @@ object CommandParser {
             app = app.replace(Regex("(?i)\\s+(app|application|please|for me|now|ah|a)$"), "").trim()
             val nonAppWords = listOf("door", "window", "gate", "bottle", "box", "bag", "something", "anything", "background", "tab", "website", "site")
             val isWebDomain = app.contains(".com") || app.contains(".dev") || app.contains(".org") ||
-                    app.contains(".net") || app.contains(".io") || DomainNormalizer.isKnownWebAlias(app)
+                    app.contains(".net") || app.contains(".io") || app.startsWith("http://") || app.startsWith("https://") || app.startsWith("www.")
             if (app.isNotBlank() && !nonAppWords.contains(app.lowercase(Locale.ROOT)) && !isWebDomain) {
                 return ParsedCommandResult(JarvisCommand.OpenApp(app), 0.96f, "OPEN_APP")
             }

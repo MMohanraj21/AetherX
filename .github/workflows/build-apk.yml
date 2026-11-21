@@ -97,54 +97,33 @@ jobs:
         if: github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v5.0.1
-          name: "Zara AI Assistant v5.0.1 — Speech Recognition, Live Conversation & Lifecycle Stability Repair"
+          tag_name: v5.1.0
+          name: "Zara AI Assistant v5.1.0 — SuperX Capsule 2.0 & Intelligent App Launch Repair"
           body: |
-            ### Zara AI Assistant v5.0.1 (Release Build 501)
+            ### Zara AI Assistant v5.1.0 (Release Build 510)
             Architected, Designed & Developed exclusively by Mohanraj (@Hexvora777).
             Official Connections:
             - Telegram: https://t.me/Hexvora777
             - Instagram: https://instagram.com/Hexvora777
             - Motto: "Every identity has an origin. Mine is Mohanraj."
 
-            ### What's New in v5.0.1 (Complete Voice & Speech Recognition Repair):
-            - **Fixed 'Spoken user query' Placeholder**:
-              - Enabled `inputAudioTranscription: {}` in Gemini Live setup to stream real user speech transcription.
-              - Saved and displayed exact recognized Tamil/Tanglish/English transcripts in chat history.
-            - **Fixed MainActivity Opening Interruption**:
-              - Protected active voice conversations during Activity `onResume()`. Opening/minimizing the app no longer kills voice sessions.
-            - **Eliminated Stuck in Listening & Thinking**:
-              - Dispatched `audioStreamEnd` upon adaptive silence detection so Gemini immediately starts generating replies without waiting for server timeouts.
-              - Standardized camelCase payloads (`systemInstruction`, `generationConfig`, `toolResponse`, `clientContent`) for Gemini Live WebSocket.
-            - **Natural Tamil, Tanglish & Multi-Turn Intelligence**:
-              - Native spoken Tamil/Tanglish comprehension without keyword truncation.
-              - Full contextual discourse tracking for follow-ups ("Appo yen...", "Give me an example").
-            - **Voice Pipeline Diagnostics (`VoicePipelineDiagnostics`)**:
-              - Stage-by-stage latency and failure monitoring across the entire voice pipeline.
-              - 850ms dynamic continuation pause for complex sentences and Tamil/Tanglish clauses ("anal", "appuram").
-            - **True Voice Barge-In & Interruption Protection**:
-              - Atomic turn epochs and instantaneous hardware `AudioTrack` flush upon user speech.
-              - Complete prevention of old audio bleed via server turn abort.
-            - **Context-Aware Smart Confirmation Gate (`MessageExecutionGate`)**:
-              - Strict verbal confirmation token bound to recipient and content hash. Zero auto-send bypasses.
-            - **Dynamic Context Retention**:
-              - Automatic multi-turn conversation and entity re-injection on WebSocket reconnects.
-            - **Unwanted Ghost Bubble Completely Removed**:
-              - Deactivated `TaskProgressOverlay` and stripped `SYSTEM_ALERT_WINDOW`.
-              - Zero floating bubble on the right side of the screen; pure native Vivo Origin Island SuperX status capsule at the top.
-            - **Continuous Conversation Engine & Audio Lifecycle Fix**:
-              - Fixed session termination after single-sentence commands; microphone remains active in `LISTENING` mode for natural follow-up speech.
-              - Replaced aggressive 2s background timeout with 15s natural dialogue window.
-              - Eliminated repetitive greeting injection ("Please tell me from the beginning / I am learning").
-            - **Smart Notification Intelligence**:
-              - Privacy filtering (excluding OTPs, passwords, bank transactions).
-              - Vocal announcement of incoming messages and contextual reply suggestions.
-              - Official Android RemoteInput reply execution with vocal confirmation.
-            - **Smart Call Announcement & Authorized Control**:
-              - Real-time telephony state tracking and caller contact resolution.
-              - Hands-free voice answering and declining in English, Tamil, and Tanglish.
-            - **Next-Gen AI Modules & Central AI Orchestrator**:
-              - Screen Intelligence, Autonomous Task Agent with safety gates, Offline AI Mode, Advanced Personal Memory v4, Smart Automation Modes, Live Language Translator, Universal Media Controller, AI Privacy Guardian, Emergency SOS Assistant, and Daily Briefing Engine.
+            ### What's New in v5.1.0:
+            - **Intelligent Native Android App Launching**:
+              - Fixed "Open Instagram" and "Open ChatGPT" opening in Chrome browser!
+              - Resolved phonetic domain hijacking in `CommandParser.kt`. Only explicit website queries open in Chrome.
+              - Native package launcher for Instagram, ChatGPT, WhatsApp, YouTube, Spotify, Settings, Camera, Gallery, and Chrome with Android 11+ `<queries>` package visibility compliance.
+              - Missing application handling: Gracefully alerts user when an app is not installed instead of silently opening Chrome.
+            - **SuperX Capsule 2.0 (Premium Transformation)**:
+              - Dynamic Island-inspired interaction with 60 FPS spring animations.
+              - Cute AI Companion expressions: Blinking animated eyes, breathing, thinking neural orbit, audio-reactive waveform mouth, celebratory (^ ^) face, and gentle error shake.
+              - Interactive expansion: Tap capsule to expand into SuperX Dashboard with live transcripts, music controls, battery % + charging status, and time.
+            - **Critical Voice Engine & State Machine Repair**:
+              - Fixed "Zara only says 'I'm here'" / wake word loop by replacing long greeting speech with immediate wake chime, instantly opening the microphone for user commands.
+              - Fixed Gemini Live VAD deadlocks: Conformed to official BidiGenerateContent `activityStart` and `activityEnd` signals.
+              - Structured error classification: Internet unavailable, AI authentication failed, API quota exceeded, AI server unavailable.
+            - **Dedicated Voice Diagnostics Screen**:
+              - Live status dashboard for Mic permission, Hardware, Vosk, Gemini Live, WebSocket latency, and structured telemetry logs.
+              - One-tap "Test Connection & Retry" trigger.
           files: |
             artifacts/Zara-release.apk
             artifacts/Zara-debug.apk

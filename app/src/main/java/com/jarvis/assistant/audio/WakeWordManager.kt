@@ -14,14 +14,17 @@ import kotlinx.coroutines.flow.asStateFlow
  * State machine representing the voice cycle of ZARA AI.
  *
  * Sequence:
- * IDLE -> WAKE_WORD_DETECTED -> ACTIVATING -> LISTENING -> PROCESSING -> SPEAKING -> RESUMING_WAKE_WORD -> IDLE
+ * IDLE -> WAKE_WORD_DETECTED -> MICROPHONE_HANDOFF -> LISTENING -> TRANSCRIBING -> PROCESSING -> EXECUTING -> SPEAKING -> RESUMING_WAKE_WORD -> IDLE
  */
 enum class VoiceCycleState {
     IDLE,
     WAKE_WORD_DETECTED,
+    MICROPHONE_HANDOFF,
     ACTIVATING,
     LISTENING,
+    TRANSCRIBING,
     PROCESSING,
+    EXECUTING,
     SPEAKING,
     RESUMING_WAKE_WORD
 }

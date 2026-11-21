@@ -84,39 +84,80 @@ class ZaraIslandManager private constructor(private val appContext: Context) {
         context.startActivity(intent)
     }
 
+    private fun dp(v: Int): Int = (v * appContext.resources.displayMetrics.density).toInt()
+
     /**
-     * Attaches or updates Island integration.
+     * Attaches or updates SuperX Capsule 2.0 integration.
      *
      * In accordance with requirements:
-     * - If native system Island is supported, bridges to native Live Activity.
-     * - If unsupported, fake floating overlay is STRICTLY DISABLED.
+     * - Bridges to native system island (Vivo Origin Island / SuperX capsule notification).
+     * - Renders interactive SuperX Capsule 2.0 overlay when overlay permission is granted.
      */
     @SuppressLint("WrongConstant")
     fun showIsland(): Boolean {
-        // Enforce: Never create a fake floating island as a replacement
-        if (!isNativeSupported()) {
-            Log.i(TAG, "Device does not support genuine native Island. Fake overlay simulation strictly disabled.")
-            hideIsland()
-            return false
-        }
-
         val prefs = (appContext as? JarvisApp)?.preferences
         if (prefs != null && !prefs.isIslandEnabled) {
             hideIsland()
             return false
         }
 
-        // Bridge to native system island
-        val currentState = JarvisConversationService.conversationState.value
-        nativeBridge.updateState(currentState)
+        // 1. Bridge to native system island (Vivo Origin Island)
+        if (isNativeSupported()) {
+            val currentState = JarvisConversationService.conversationState.value
+            nativeBridge.updateState(currentState)
+        }
+
+        // 2. Attach Interactive SuperX Capsule 2.0 overlay view when permission granted
+        if (hasOverlayPermission()) {
+            attachOverlayView()
+        }
+
         return true
+    }
+
+    private fun attachOverlayView() {
+        if (isOverlayAttached && overlayView != null) return
+        try {
+            val layoutType = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+            } else {
+                @Suppress("DEPRECATION")
+                WindowManager.LayoutParams.TYPE_PHONE
+            }
+
+            val params = WindowManager.LayoutParams(
+                WindowManager.LayoutParams.WRAP_CONTENT,
+                WindowManager.LayoutParams.WRAP_CONTENT,
+                layoutType,
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                        WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+                        WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+                PixelFormat.TRANSLUCENT
+            ).apply {
+                gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
+                y = dp(12) // Positioned naturally around the camera cutout
+            }
+
+            val view = ZaraIslandOverlayView(appContext).also {
+                setupOverlayCallbacks(it)
+                overlayView = it
+            }
+
+            windowManager.addView(view, params)
+            isOverlayAttached = true
+            windowParams = params
+            view.startFrameTicker()
+            Log.i(TAG, "SuperX Capsule 2.0 attached successfully to WindowManager.")
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to attach SuperX Capsule overlay: ${e.message}", e)
+        }
     }
 
     fun hideIsland() {
         nativeBridge.dismiss()
         if (!isOverlayAttached || overlayView == null) return
         try {
-            overlayView?.stopFrameTicker()
+            overlayView?.cleanup()
             windowManager.removeView(overlayView)
         } catch (e: Exception) {
             Log.w(TAG, "Error removing overlay view: ${e.message}")

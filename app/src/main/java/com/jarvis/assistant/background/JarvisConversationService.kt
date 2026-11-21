@@ -1545,6 +1545,8 @@ class JarvisConversationService : Service() {
                             _liveAssistantResponse.value = ""
                             hasExecutedCommandInCurrentTurn = false
                             totalVoicedFramesInCurrentUtterance = 0
+                            liveWebSocket?.sendActivityStart()
+                            com.jarvis.assistant.audio.WakeWordManager.transitionTo(com.jarvis.assistant.audio.VoiceCycleState.TRANSCRIBING, "User speech detected")
                             synchronized(currentUtteranceAudioStream) {
                                 currentUtteranceAudioStream.reset()
                                 synchronized(preSpeechRingBuffer) {
@@ -3140,6 +3142,7 @@ class JarvisConversationService : Service() {
             enterStandby(announce = false)
             return
         }
+        com.jarvis.assistant.audio.WakeWordManager.transitionTo(com.jarvis.assistant.audio.VoiceCycleState.EXECUTING, "Executing: $command")
         hasExecutedCommandInCurrentTurn = true
         lastCommandExecutionTime = System.currentTimeMillis()
         suppressAudioUntilTurnComplete = false
@@ -3656,14 +3659,12 @@ class JarvisConversationService : Service() {
             }
         } else {
             pendingCommandUtterance = null
-            val greeting = "Yes, I'm listening."
-            Log.i("ZaraAssistant", "TTS_STARTED: Speaking '$greeting'")
-            speakImmediateVoiceResponse(greeting) {
-                Log.i("ZaraAssistant", "TTS_COMPLETED: Finished speaking greeting")
-            }
+            // Play crisp wake sound immediately without drowning out microphone with long speech
+            com.jarvis.assistant.audio.JarvisSoundEffects.playWakeSound()
         }
 
         // Open microphone immediately on foreground service so command is heard without delay
+        com.jarvis.assistant.audio.WakeWordManager.transitionTo(com.jarvis.assistant.audio.VoiceCycleState.MICROPHONE_HANDOFF, "Handoff to active recording")
         com.jarvis.assistant.audio.WakeWordManager.transitionTo(com.jarvis.assistant.audio.VoiceCycleState.LISTENING, "Listening for voice command")
         beginActiveConversation(wakeTriggered = true)
     }

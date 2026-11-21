@@ -631,12 +631,24 @@ class PhoneControlManager(
         val clean = appNameOrPackage.trim().lowercase(Locale.ROOT)
         Log.i(TAG, "openApp called with: '$clean'")
 
-        // Check if query is actually a URL or domain: e.g. "open github.com"
+        // Check if query is explicitly a URL or domain: e.g. "open github.com" or "open https://..."
         val domainRegex = Regex(".*\\b([a-zA-Z0-9-]+\\.(?:com|org|net|in|io|co|ai|edu|gov|app|dev|me)(?:/[^\\s]*)?)\\b.*", RegexOption.IGNORE_CASE)
         val domainMatch = domainRegex.find(clean)
         if (domainMatch != null || clean.startsWith("http://") || clean.startsWith("https://") || clean.startsWith("www.")) {
             val urlTarget = domainMatch?.groupValues?.get(1) ?: clean
             return openUrl(urlTarget)
+        }
+
+        // Delegate to AppLauncher for comprehensive dual-apps, aliases & PackageManager resolution
+        val launcherRes = com.jarvis.assistant.util.AppLauncher.openAppResult(context, clean)
+        when (launcherRes) {
+            is com.jarvis.assistant.util.AppLauncher.OpenAppResult.Success -> {
+                return "Opening ${launcherRes.app.label}."
+            }
+            is com.jarvis.assistant.util.AppLauncher.OpenAppResult.MultipleFound -> {
+                return "Opening ${launcherRes.matches[0].label}."
+            }
+            else -> {}
         }
 
         // Special case: Camera
@@ -733,14 +745,19 @@ class PhoneControlManager(
             }
         }
 
-        // Fallback: If no app is installed on phone, check if it is a known web-only platform (e.g. Google Flow)
-        val webFallbackUrl = parseTargetUrl(clean)
-        if (webFallbackUrl != null) {
-            Log.i(TAG, "No native app found for '$clean', falling back to web platform: $webFallbackUrl")
-            return openUrl(webFallbackUrl)
+        // ONLY fallback to web platform if the user EXPLICITLY requested a website or web tool
+        val isExplicitWebIntent = clean.contains("website") || clean.contains("site") || clean.contains("web") ||
+                clean.contains("in browser") || clean.contains("in chrome") || clean.contains("google flow") || clean.contains("flow")
+        if (isExplicitWebIntent) {
+            val webFallbackUrl = parseTargetUrl(clean)
+            if (webFallbackUrl != null) {
+                Log.i(TAG, "Explicit web platform requested for '$clean', opening in browser: $webFallbackUrl")
+                return openUrl(webFallbackUrl)
+            }
         }
 
-        return "I could not find $appNameOrPackage installed on this device."
+        // Never silently redirect an application request to Chrome!
+        return "${appNameOrPackage.replaceFirstChar { it.uppercase() }} app is not installed on this device."
     }
 
     private fun resolveInstalledPackageByName(query: String): String? {

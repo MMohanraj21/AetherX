@@ -177,6 +177,10 @@ class SettingsFragment : Fragment() {
             startActivity(Intent(requireContext(), ApiConnectionActivity::class.java))
         }
 
+        binding.rowVoiceDiagnostics.setOnClickListener {
+            startActivity(Intent(requireContext(), com.jarvis.assistant.ui.diagnostics.VoiceDiagnosticsActivity::class.java))
+        }
+
         binding.rowMemory.setOnClickListener {
             startActivity(Intent(requireContext(), MemoryActivity::class.java))
         }

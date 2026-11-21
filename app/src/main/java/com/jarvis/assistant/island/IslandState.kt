@@ -8,9 +8,12 @@ enum class IslandMode {
     LISTENING,
     THINKING,
     SPEAKING,
+    SUCCESS,
+    ERROR,
     NOTIFICATION,
     MUSIC,
-    CALL
+    CALL,
+    EXPANDED
 }
 
 data class IslandNotificationData(

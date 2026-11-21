@@ -36,6 +36,32 @@
     <uses-permission android:name="android.permission.WRITE_CALENDAR" />
     <uses-feature android:name="android.hardware.camera.flash" android:required="false" />
 
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
+        <intent>
+            <action android:name="android.media.action.IMAGE_CAPTURE" />
+        </intent>
+        <intent>
+            <action android:name="android.media.action.STILL_IMAGE_CAMERA" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:mimeType="image/*" />
+        </intent>
+        <package android:name="com.instagram.android" />
+        <package android:name="com.openai.chatgpt" />
+        <package android:name="com.whatsapp" />
+        <package android:name="com.google.android.youtube" />
+        <package android:name="com.spotify.music" />
+        <package android:name="com.android.chrome" />
+        <package android:name="com.android.settings" />
+        <package android:name="com.google.android.apps.photos" />
+        <package android:name="org.telegram.messenger" />
+    </queries>
+
     <application
         android:name=".JarvisApp"
         android:allowBackup="false"
@@ -90,6 +116,11 @@
             android:exported="false"
             android:screenOrientation="portrait"
             android:windowSoftInputMode="adjustResize" />
+
+        <activity
+            android:name=".ui.diagnostics.VoiceDiagnosticsActivity"
+            android:exported="false"
+            android:screenOrientation="portrait" />
 
         <activity
             android:name=".ui.settings.PersonaActivity"
