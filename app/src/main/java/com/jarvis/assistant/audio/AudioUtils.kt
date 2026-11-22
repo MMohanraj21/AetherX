@@ -108,4 +108,29 @@ object AudioUtils {
             high = high
         )
     }
+
+    /**
+     * Validates whether an analyzed audio frame exhibits genuine human vocal characteristics
+     * (fundamental vocal cord pitch ~70Hz-450Hz and formant body in mid frequencies)
+     * while strictly rejecting animal sounds (barking, birds), whistles, fan drone, and static.
+     */
+    fun isHumanVoice(freq: AudioFrequencyData): Boolean {
+        if (freq.amplitude < 0.030f) return false
+
+        // 1. Human pitch range: Fundamental frequency of human vocal cords
+        // Adult male: ~85Hz-180Hz, Adult female: ~165Hz-255Hz, Children: up to ~400Hz
+        val isHumanPitch = freq.pitchHz in 70f..450f
+
+        // 2. Human vocal formant body: Human speech vowels & formants resonate in 300Hz-3400Hz (mid band)
+        val hasVocalBody = freq.mid >= 0.035f && freq.mid >= (freq.high * 0.65f)
+
+        // 3. Animal & non-human noise rejection criteria:
+        // - High frequency shrieks / bird chirps / whistles / squeaks / dog barking harmonics (> 1200Hz)
+        val isHighNoiseOrAnimal = freq.high > 0.40f && freq.high > (freq.mid * 1.75f)
+
+        // - Low-frequency continuous drone / fan rumble / wind without vocal harmonics
+        val isLowRumbleNoise = freq.bass > 0.45f && freq.mid < 0.04f
+
+        return (isHumanPitch || hasVocalBody) && !isHighNoiseOrAnimal && !isLowRumbleNoise
+    }
 }

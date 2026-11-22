@@ -10,9 +10,10 @@ package com.jarvis.assistant.audio.realtime
  */
 object EndOfTurnDetector {
 
-    private const val THRESHOLD_SHORT_CONFIRMATION_MS = 300L
-    private const val THRESHOLD_DEFAULT_CONVERSATION_MS = 460L
-    private const val THRESHOLD_EXTENDED_CLAUSE_MS = 850L
+    // Optimized for ultra-responsive, low-latency turn completion
+    private const val THRESHOLD_SHORT_CONFIRMATION_MS = 200L
+    private const val THRESHOLD_DEFAULT_CONVERSATION_MS = 320L
+    private const val THRESHOLD_EXTENDED_CLAUSE_MS = 600L
 
     // Short affirmative or negative tokens where user has clearly completed their turn
     private val SHORT_CONFIRMATION_TOKENS = setOf(
@@ -57,7 +58,7 @@ object EndOfTurnDetector {
 
         // 3. Very short query (< 1 second) that is not an affirmative: give reasonable headroom
         if (speechDurationMs < 1000L && words.size < 3) {
-            return 550L
+            return 360L
         }
 
         // 4. Standard conversational sentence

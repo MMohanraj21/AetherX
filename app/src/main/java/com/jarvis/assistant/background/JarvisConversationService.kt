@@ -316,11 +316,12 @@ class JarvisConversationService : Service() {
     private var lastVerifiedFlowPrompt = ""
     private var autonomousLoopJob: Job? = null
     private val MAX_AUTONOMOUS_STEPS = 25
-    // Mic voice-activity tuning. Raised so room noise no longer flips LISTENING/THINKING when nobody speaks.
-    private val VAD_MIN_THRESHOLD = 0.05f
-    private val VAD_NOISE_MULTIPLIER = 2.0f
-    private val VAD_START_FRAMES = 5
-    private val VAD_MIN_UTTERANCE_FRAMES = 10
+    // Mic voice-activity tuning with Human Vocal Isolation:
+    // Requires confirmed human pitch (70-450Hz) + formant body; rejects animal sounds & fan drone.
+    private val VAD_MIN_THRESHOLD = 0.045f
+    private val VAD_NOISE_MULTIPLIER = 1.9f
+    private val VAD_START_FRAMES = 4
+    private val VAD_MIN_UTTERANCE_FRAMES = 8
     // Loop guard: once tripped, ALL automation tools are refused until the user speaks again.
     @Volatile
     private var autonomousHardStop = false
@@ -1539,8 +1540,9 @@ class JarvisConversationService : Service() {
                     // which cancels out speaker output. When the user speaks, their near-field voice
                     // raises mic amplitude above the cancellation floor.
                     val bargeInThreshold = if (hasHeadset) 0.20f else 0.28f
+                    val isHumanBargeIn = com.jarvis.assistant.audio.AudioUtils.isHumanVoice(frequencyData)
 
-                    if (amplitude > bargeInThreshold) {
+                    if (amplitude > bargeInThreshold && isHumanBargeIn) {
                         consecutiveVoicedFrames++
                         if (consecutiveVoicedFrames >= 3) {
                             Log.i("JarvisService", "Voice barge-in triggered! User interrupted speech (amp=$amplitude, hasHeadset=$hasHeadset)")
@@ -1583,7 +1585,12 @@ class JarvisConversationService : Service() {
                 // Dynamic voice threshold: responsive to normal conversational volume (0.035f)
                 val voiceThreshold = maxOf(VAD_MIN_THRESHOLD, ambientNoiseFloor * VAD_NOISE_MULTIPLIER)
 
-                if (amplitude > voiceThreshold) {
+                // Human Voice Isolation: strictly check pitch in human vocal cords (70-450Hz) and formant body
+                // Rejects non-human noise (animal barks, bird chirps, fan rumble, clicks)
+                val isHumanVocal = com.jarvis.assistant.audio.AudioUtils.isHumanVoice(frequencyData)
+                val isVoicedSpeech = (amplitude > voiceThreshold) && isHumanVocal
+
+                if (isVoicedSpeech) {
                     consecutiveVoicedFrames++
                     lastUserSpeechDetectedTime = now
                     _audioLevel.value = amplitude

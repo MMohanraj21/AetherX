@@ -30,6 +30,8 @@ class VoiceActivityDetector(
     ): FrameAnalysis {
         val now = System.currentTimeMillis()
         val amplitude = AudioUtils.calculateRmsNormalized(chunk, chunk.size)
+        val freqData = AudioUtils.analyzeFrequency(chunk, chunk.size)
+        val isHumanVocal = AudioUtils.isHumanVoice(freqData)
 
         // Adaptive noise floor tracking when room is quiet
         if (amplitude < 0.10f) {
@@ -37,10 +39,10 @@ class VoiceActivityDetector(
         }
 
         // When assistant is speaking, use higher threshold to distinguish near-field user speech
-        // from hardware acoustic echo cancellation residual floor.
+        // from hardware acoustic echo cancellation residual floor, plus human vocal cord verification.
         if (isSpeakerActive) {
             val bargeInThreshold = if (hasHeadset) bargeInThresholdQuiet else bargeInThresholdSpeaker
-            val isVoiced = amplitude > bargeInThreshold
+            val isVoiced = amplitude > bargeInThreshold && isHumanVocal
             val count = if (isVoiced) consecutiveVoicedFrames.incrementAndGet() else {
                 consecutiveVoicedFrames.set(0)
                 0
@@ -58,9 +60,9 @@ class VoiceActivityDetector(
             )
         }
 
-        // Standard user speaking mode: dynamic threshold based on ambient noise floor
+        // Standard user speaking mode: dynamic threshold based on ambient noise floor + human voice isolation
         val dynamicThreshold = maxOf(minThreshold, ambientNoiseFloor * noiseFloorMultiplier)
-        val isVoiced = amplitude > dynamicThreshold
+        val isVoiced = amplitude > dynamicThreshold && isHumanVocal
 
         val count = if (isVoiced) {
             lastSpeechDetectedTime = now
