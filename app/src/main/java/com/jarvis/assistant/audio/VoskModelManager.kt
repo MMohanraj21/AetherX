@@ -31,6 +31,26 @@ object VoskModelManager {
     var speakerModel: SpeakerModel? = null
         private set
 
+    /**
+     * Rapid offline transcription of 16kHz PCM audio bytes using the loaded Vosk acoustic model.
+     * Thread-safe and executes synchronously in memory.
+     */
+    fun transcribe(pcmAudio: ByteArray): String {
+        val m = model ?: return ""
+        if (pcmAudio.size < 320) return ""
+        return try {
+            val rec = org.vosk.Recognizer(m, 16000.0f)
+            rec.acceptWaveForm(pcmAudio, pcmAudio.size)
+            val jsonStr = rec.finalResult
+            rec.close()
+            val json = org.json.JSONObject(jsonStr)
+            json.optString("text", "").trim()
+        } catch (e: Exception) {
+            Log.e(TAG, "transcribe error: ${e.message}", e)
+            ""
+        }
+    }
+
     private val isInitializing = java.util.concurrent.atomic.AtomicBoolean(false)
 
     fun init(context: Context, scope: CoroutineScope) {

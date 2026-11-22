@@ -22,15 +22,24 @@ object VoicePipelineDiagnostics {
 
     enum class PipelineStage {
         MICROPHONE_INIT,
+        WAKE_WORD_DETECTED,
         AUDIO_CAPTURE,
         PCM_BUFFER,
+        SPEECH_RECOGNITION,
+        TRANSCRIPT_GENERATED,
         GEMINI_AUDIO_INPUT,
         USER_TURN_DETECTION,
         MODEL_REQUEST_START,
+        AI_REQUEST_SUBMITTED,
+        GEMINI_CONNECTED,
         FIRST_RESPONSE_CHUNK,
+        RESPONSE_RECEIVED,
+        RESPONSE_COMPLETED,
         AUDIO_PLAYBACK_START,
+        TTS_PLAYBACK,
         AUDIO_PLAYBACK_END,
-        LISTENING_RECOVERED
+        LISTENING_RECOVERED,
+        FAILURE_REASON
     }
 
     data class DiagnosticLogEntry(

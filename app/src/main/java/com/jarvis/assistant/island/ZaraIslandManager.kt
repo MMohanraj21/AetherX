@@ -87,13 +87,12 @@ class ZaraIslandManager private constructor(private val appContext: Context) {
     private fun dp(v: Int): Int = (v * appContext.resources.displayMetrics.density).toInt()
 
     /**
-     * Attaches or updates SuperX Capsule 2.0 integration.
+     * Bridges to native Vivo Origin Island (OriginOS 6 / Android 16).
      *
      * In accordance with requirements:
-     * - Bridges to native system island (Vivo Origin Island / SuperX capsule notification).
-     * - Renders interactive SuperX Capsule 2.0 overlay when overlay permission is granted.
+     * - ZERO floating window overlays.
+     * - Bridges directly to native Vivo Origin Island via promoted ongoing notification.
      */
-    @SuppressLint("WrongConstant")
     fun showIsland(): Boolean {
         val prefs = (appContext as? JarvisApp)?.preferences
         if (prefs != null && !prefs.isIslandEnabled) {
@@ -101,69 +100,33 @@ class ZaraIslandManager private constructor(private val appContext: Context) {
             return false
         }
 
-        // 1. Bridge to native system island (Vivo Origin Island)
+        // Bridge to native system island (Vivo Origin Island)
+        val currentState = JarvisConversationService.conversationState.value
+        OriginIslandController.updateVoiceState(appContext, currentState)
         if (isNativeSupported()) {
-            val currentState = JarvisConversationService.conversationState.value
             nativeBridge.updateState(currentState)
-        }
-
-        // 2. Attach Interactive SuperX Capsule 2.0 overlay view when permission granted
-        if (hasOverlayPermission()) {
-            attachOverlayView()
         }
 
         return true
     }
 
     private fun attachOverlayView() {
-        if (isOverlayAttached && overlayView != null) return
-        try {
-            val layoutType = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
-            } else {
-                @Suppress("DEPRECATION")
-                WindowManager.LayoutParams.TYPE_PHONE
-            }
-
-            val params = WindowManager.LayoutParams(
-                WindowManager.LayoutParams.WRAP_CONTENT,
-                WindowManager.LayoutParams.WRAP_CONTENT,
-                layoutType,
-                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                        WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
-                        WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
-                PixelFormat.TRANSLUCENT
-            ).apply {
-                gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
-                y = dp(12) // Positioned naturally around the camera cutout
-            }
-
-            val view = ZaraIslandOverlayView(appContext).also {
-                setupOverlayCallbacks(it)
-                overlayView = it
-            }
-
-            windowManager.addView(view, params)
-            isOverlayAttached = true
-            windowParams = params
-            view.startFrameTicker()
-            Log.i(TAG, "SuperX Capsule 2.0 attached successfully to WindowManager.")
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to attach SuperX Capsule overlay: ${e.message}", e)
-        }
+        // Disabled by architectural requirement: NO floating overlay capsules or duplicate interfaces.
     }
 
     fun hideIsland() {
+        OriginIslandController.dismiss(appContext)
         nativeBridge.dismiss()
-        if (!isOverlayAttached || overlayView == null) return
-        try {
-            overlayView?.cleanup()
-            windowManager.removeView(overlayView)
-        } catch (e: Exception) {
-            Log.w(TAG, "Error removing overlay view: ${e.message}")
-        } finally {
-            isOverlayAttached = false
-            overlayView = null
+        if (isOverlayAttached && overlayView != null) {
+            try {
+                overlayView?.cleanup()
+                windowManager.removeView(overlayView)
+            } catch (e: Exception) {
+                Log.w(TAG, "Error removing overlay view: ${e.message}")
+            } finally {
+                isOverlayAttached = false
+                overlayView = null
+            }
         }
     }
 

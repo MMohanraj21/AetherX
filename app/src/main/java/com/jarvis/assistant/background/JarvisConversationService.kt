@@ -442,12 +442,7 @@ class JarvisConversationService : Service() {
         if (_conversationState.value != state) {
             _conversationState.value = state
             if (_isSessionOn.value && !_isStandby.value) {
-                when (state) {
-                    ConversationState.LISTENING -> com.jarvis.assistant.island.OriginIslandController.startListening(this)
-                    ConversationState.THINKING -> com.jarvis.assistant.island.OriginIslandController.startThinking(this)
-                    ConversationState.SPEAKING -> com.jarvis.assistant.island.OriginIslandController.startSpeaking(this)
-                    ConversationState.IDLE -> com.jarvis.assistant.island.OriginIslandController.startListening(this)
-                }
+                com.jarvis.assistant.island.OriginIslandController.updateVoiceState(this, state)
             } else {
                 com.jarvis.assistant.island.OriginIslandController.dismiss(this)
                 updateNotification()
@@ -751,6 +746,18 @@ class JarvisConversationService : Service() {
             ACTION_STOP_ALL -> {
                 fullStop()
                 return START_NOT_STICKY
+            }
+            com.jarvis.assistant.island.OriginIslandController.ACTION_PLAY_PAUSE -> {
+                val mediaCtrl = com.jarvis.assistant.media.UniversalMediaController(this)
+                mediaCtrl.togglePlayPause()
+            }
+            com.jarvis.assistant.island.OriginIslandController.ACTION_NEXT -> {
+                val mediaCtrl = com.jarvis.assistant.media.UniversalMediaController(this)
+                mediaCtrl.next()
+            }
+            com.jarvis.assistant.island.OriginIslandController.ACTION_PREVIOUS -> {
+                val mediaCtrl = com.jarvis.assistant.media.UniversalMediaController(this)
+                mediaCtrl.previous()
             }
             else -> {
                 // System restarted service or restarted after recents removal
@@ -1681,28 +1688,124 @@ class JarvisConversationService : Service() {
                                         liveWebSocket?.sendAudioStreamEnd()
                                         com.jarvis.assistant.audio.diagnostics.VoicePipelineDiagnostics.markStage(
                                             com.jarvis.assistant.audio.diagnostics.VoicePipelineDiagnostics.PipelineStage.USER_TURN_DETECTION,
-                                            "Adaptive silence threshold reached (${adaptiveThreshold}ms). Dispatched audioStreamEnd."
+                                            "Adaptive silence threshold reached (${adaptiveThreshold}ms)."
                                         )
                                     }
+
+                                    // Offline / local speech transcription on captured audio bytes
+                                    val capturedAudio = synchronized(currentUtteranceAudioStream) { currentUtteranceAudioStream.toByteArray() }
+                                    if (currentTurnUserText.isBlank() && capturedAudio.isNotEmpty()) {
+                                        val offlineTranscript = com.jarvis.assistant.audio.VoskModelManager.transcribe(capturedAudio)
+                                        if (offlineTranscript.isNotBlank()) {
+                                            currentTurnUserText.append(offlineTranscript)
+                                            _liveUserTranscript.value = offlineTranscript
+                                            Log.i("ZaraAssistant", "SPEECH_RECOGNITION: Offline transcribed: '$offlineTranscript'")
+                                        }
+                                    }
+
+                                    val userQuery = currentTurnUserText.toString().trim()
+                                    if (userQuery.isNotBlank()) {
+                                        _liveUserTranscript.value = userQuery
+
+                                        // High-speed local intent evaluation (Flashlight, Volume, Time, Media, App, Calls, etc.)
+                                        val handledLocally = com.jarvis.assistant.orchestrator.ZaraAIOrchestrator.getInstance(this@JarvisConversationService)
+                                            .processVoiceUtterance(userQuery) { vocalFeedback ->
+                                                speakImmediateVoiceResponse(vocalFeedback) {
+                                                    setConversationState(ConversationState.IDLE)
+                                                    com.jarvis.assistant.island.OriginIslandController.updateVoiceState(this@JarvisConversationService, ConversationState.IDLE)
+                                                }
+                                            }
+
+                                        if (handledLocally) {
+                                            Log.i("ZaraAssistant", "COMMAND_EXECUTED: Handled locally by ZaraAIOrchestrator: '$userQuery'")
+                                            liveWebSocket?.abortTurn()
+                                            currentTurnAssistantText.clear()
+                                            currentTurnUserText.clear()
+                                            hasSpeechInCurrentUtterance = false
+                                            hasSignalledUtteranceEnd = false
+                                            consecutiveVoicedFrames = 0
+                                            totalVoicedFramesInCurrentUtterance = 0
+                                            synchronized(currentUtteranceAudioStream) { currentUtteranceAudioStream.reset() }
+                                            setConversationState(ConversationState.IDLE)
+                                            com.jarvis.assistant.island.OriginIslandController.updateVoiceState(this@JarvisConversationService, ConversationState.IDLE)
+                                            return@launch
+                                        }
+                                    }
+
+                                    // Generative AI Turn: Stream to Gemini Live with 6-second auto-fallback to GeminiRestClient
                                     setConversationState(ConversationState.THINKING)
+                                    com.jarvis.assistant.island.OriginIslandController.updateVoiceState(this@JarvisConversationService, ConversationState.THINKING)
                                     com.jarvis.assistant.audio.diagnostics.VoicePipelineDiagnostics.markStage(
                                         com.jarvis.assistant.audio.diagnostics.VoicePipelineDiagnostics.PipelineStage.MODEL_REQUEST_START,
-                                        "Set state to THINKING, awaiting Gemini Live response"
+                                        "Set state to THINKING, awaiting Gemini response"
                                     )
                                     thinkingTimeoutJob?.cancel()
                                     thinkingTimeoutJob = serviceScope.launch {
-                                        delay(15000)
+                                        delay(6000)
                                         if (_conversationState.value == ConversationState.THINKING && (audioPlayer == null || !audioPlayer!!.isPlaying())) {
-                                            Log.i("JarvisService", "Thinking timeout safety; returning to IDLE")
+                                            Log.i("JarvisService", "Gemini Live silent or delayed. Executing GeminiRestClient fallback for: '$userQuery'")
+
+                                            val app = application as? JarvisApp
+                                            val apiKey = app?.preferences?.apiKey?.trim().orEmpty()
+                                            val sysPrompt = generateCurrentSystemPrompt()
+
+                                            if (apiKey.isNotBlank() && userQuery.isNotBlank()) {
+                                                val restResult = com.jarvis.assistant.network.GeminiRestClient.generateContent(
+                                                    apiKey = apiKey,
+                                                    prompt = userQuery,
+                                                    systemInstruction = sysPrompt
+                                                )
+
+                                                if (restResult.isSuccess) {
+                                                    val reply = restResult.getOrNull().orEmpty()
+                                                    Log.i("JarvisService", "GeminiRestClient fallback succeeded: '${reply.take(50)}...'")
+                                                    currentTurnAssistantText.clear()
+                                                    currentTurnAssistantText.append(reply)
+                                                    _liveAssistantResponse.value = reply
+
+                                                    app?.chatRepository?.addTurn(
+                                                        userText = userQuery,
+                                                        jarvisText = reply
+                                                    )
+
+                                                    setConversationState(ConversationState.SPEAKING)
+                                                    com.jarvis.assistant.island.OriginIslandController.updateVoiceState(this@JarvisConversationService, ConversationState.SPEAKING)
+                                                    speakImmediateVoiceResponse(reply) {
+                                                        setConversationState(ConversationState.IDLE)
+                                                        com.jarvis.assistant.island.OriginIslandController.updateVoiceState(this@JarvisConversationService, ConversationState.IDLE)
+                                                        currentTurnAssistantText.clear()
+                                                        currentTurnUserText.clear()
+                                                        _liveUserTranscript.value = ""
+                                                        _liveAssistantResponse.value = ""
+                                                        hasSpeechInCurrentUtterance = false
+                                                        hasSignalledUtteranceEnd = false
+                                                        synchronized(currentUtteranceAudioStream) { currentUtteranceAudioStream.reset() }
+                                                    }
+                                                    return@launch
+                                                }
+                                            }
+
+                                            // Fallback if network completely down
+                                            Log.i("JarvisService", "Response timeout; returning to IDLE")
                                             setConversationState(ConversationState.IDLE)
+                                            com.jarvis.assistant.island.OriginIslandController.updateVoiceState(this@JarvisConversationService, ConversationState.IDLE)
                                             lastResponseTimedOut = true
                                             updateNotification()
-                                            serviceScope.launch { _events.emit("Zara did not receive a reply. Check the connection and repeat your request.") }
+                                            val errorMsg = if (userQuery.isNotBlank()) {
+                                                "I'm unable to connect to the internet right now. Please check your network connection."
+                                            } else {
+                                                "I'm ready. Please speak your request."
+                                            }
+                                            speakImmediateVoiceResponse(errorMsg) {
+                                                setConversationState(ConversationState.IDLE)
+                                                com.jarvis.assistant.island.OriginIslandController.updateVoiceState(this@JarvisConversationService, ConversationState.IDLE)
+                                            }
+                                            serviceScope.launch { _events.emit(errorMsg) }
                                             if (!com.jarvis.assistant.JarvisApp.isAppForeground.value && preferences.isWakeWordEnabled) {
                                                 serviceScope.launch(Dispatchers.Main) {
                                                     delay(1500L)
                                                     enterStandby(announce = false)
-                                                    com.jarvis.assistant.audio.WakeWordManager.logEvent("WAKEWORD_RECOVERED", "Recovered standby after thinking timeout")
+                                                    com.jarvis.assistant.audio.WakeWordManager.logEvent("WAKEWORD_RECOVERED", "Recovered standby after timeout")
                                                 }
                                             }
                                         }

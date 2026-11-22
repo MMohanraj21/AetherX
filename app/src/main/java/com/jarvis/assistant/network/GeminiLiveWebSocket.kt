@@ -43,10 +43,10 @@ class GeminiLiveWebSocket(
 
     private val client = sharedClient
 
-    private var activeModel: String = when (model) {
-        GeminiConstants.MODEL_3_8_LIVE -> GeminiConstants.MODEL_3_8_LIVE
-        GeminiConstants.MODEL_3_1_FLASH_AGENT -> GeminiConstants.MODEL_3_1_FLASH
-        else -> if (model.isNotBlank() && !model.contains("2.5")) model else GeminiConstants.DEFAULT_MODEL
+    private var activeModel: String = when {
+        model.contains("3.8") -> GeminiConstants.MODEL_3_8_LIVE
+        model.isNotBlank() && !model.contains("2.5") && !model.contains("3.1") -> model
+        else -> GeminiConstants.DEFAULT_MODEL
     }
 
     private var webSocket: WebSocket? = null
@@ -255,9 +255,6 @@ class GeminiLiveWebSocket(
                         })
                     })
                     put("temperature", 0.6)
-                    put("thinkingConfig", JSONObject().apply {
-                        put("thinkingBudget", 0)
-                    })
                 })
                 put("inputAudioTranscription", JSONObject())
                 put("outputAudioTranscription", JSONObject())
@@ -1200,13 +1197,7 @@ class GeminiLiveWebSocket(
      */
     fun sendAudioStreamEnd() {
         if (!isConnected.get() || !isSetupComplete.get()) return
-        try {
-            val json = "{\"realtimeInput\":{\"activityEnd\":{}}}"
-            webSocket?.send(json)
-            Log.d(TAG, "Sent activityEnd signal to Gemini Live")
-        } catch (e: Exception) {
-            Log.w(TAG, "sendAudioStreamEnd error: ${e.message}")
-        }
+        Log.d(TAG, "Audio stream ended for current turn")
     }
 
     /**
@@ -1214,13 +1205,7 @@ class GeminiLiveWebSocket(
      */
     fun sendActivityStart() {
         if (!isConnected.get() || !isSetupComplete.get()) return
-        try {
-            val json = "{\"realtimeInput\":{\"activityStart\":{}}}"
-            webSocket?.send(json)
-            Log.d(TAG, "Sent activityStart signal to Gemini Live")
-        } catch (e: Exception) {
-            Log.w(TAG, "sendActivityStart error: ${e.message}")
-        }
+        Log.d(TAG, "Activity start detected")
     }
 
     /**
