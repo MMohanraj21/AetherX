@@ -263,6 +263,11 @@ class JarvisConversationService : Service() {
     @Volatile
     private var isCurrentTurnOwnerVoiceVerified = false
     @Volatile
+    private var isGeminiLiveAudioActive = false
+    @Volatile
+    private var hasLiveAudioInCurrentTurn = false
+    private val voiceOutputLock = Any()
+    @Volatile
     private var lastOwnerVerifiedTimestamp = 0L
     private val preSpeechRingBuffer = java.util.ArrayDeque<ByteArray>(12)
     private val preConnectAudioQueue = java.util.concurrent.ConcurrentLinkedQueue<ByteArray>()
@@ -482,6 +487,11 @@ class JarvisConversationService : Service() {
         Log.i("JarvisService", "BARGE-IN: Aborting speech, cancelling active tasks, and switching to LISTENING immediately.")
         audioPlayer?.flush()
         try { tts?.stop() } catch (_: Exception) {}
+        synchronized(voiceOutputLock) {
+            isGeminiLiveAudioActive = false
+            hasLiveAudioInCurrentTurn = false
+            ttsCallbacks.clear()
+        }
 
         cancelAllActiveTools()
         com.jarvis.assistant.automation.agent.AgentTaskEngine.requestCancellation()
@@ -630,8 +640,8 @@ class JarvisConversationService : Service() {
 
     /**
      * Speaks an immediate voice response using Android TTS with completion callback.
-     * Used for single-sentence command feedback ("Opening WhatsApp.") and standalone
-     * wake greeting ("Yes, I'm listening.").
+     * Enforces Single Voice Output: If Gemini Live is playing audio or has already
+     * spoken for this turn, secondary TTS playback is suppressed to eliminate overlapping voices.
      */
     fun speakImmediateVoiceResponse(text: String, onDone: (() -> Unit)? = null) {
         if (text.isBlank()) {
@@ -640,17 +650,30 @@ class JarvisConversationService : Service() {
         }
         serviceScope.launch(Dispatchers.Main) {
             try {
-                if (tts == null) {
-                    initTts()
+                synchronized(voiceOutputLock) {
+                    val isLiveSpeaking = audioPlayer?.isPlaying() == true || isGeminiLiveAudioActive || hasLiveAudioInCurrentTurn
+                    if (isLiveSpeaking) {
+                        Log.i("ZaraVoice", "Single Voice Arbiter: Suppressed secondary TTS playback ('$text') because Gemini Live audio is active.")
+                        onDone?.invoke()
+                        return@launch
+                    }
+
+                    // Flush any remaining pcm audio on audioPlayer
+                    audioPlayer?.flush()
+
+                    if (tts == null) {
+                        initTts()
+                    }
+                    val utteranceId = "zara_voice_${System.currentTimeMillis()}"
+                    if (onDone != null) {
+                        ttsCallbacks[utteranceId] = onDone
+                    }
+                    val params = Bundle().apply {
+                        putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, 1.0f)
+                    }
+                    Log.i("ZaraVoice", "Single Voice Arbiter: Speaking authoritative TTS: '$text'")
+                    tts?.speak(text, TextToSpeech.QUEUE_FLUSH, params, utteranceId)
                 }
-                val utteranceId = "zara_voice_${System.currentTimeMillis()}"
-                if (onDone != null) {
-                    ttsCallbacks[utteranceId] = onDone
-                }
-                val params = Bundle().apply {
-                    putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, 1.0f)
-                }
-                tts?.speak(text, TextToSpeech.QUEUE_FLUSH, params, utteranceId)
             } catch (e: Exception) {
                 Log.e("JarvisService", "Error in speakImmediateVoiceResponse: ${e.message}")
                 onDone?.invoke()
@@ -856,9 +879,18 @@ class JarvisConversationService : Service() {
         audioPlayer = AudioPlayer(
             onPlaybackStateChanged = { isPlaying ->
                 if (isPlaying) {
+                    synchronized(voiceOutputLock) {
+                        isGeminiLiveAudioActive = true
+                        hasLiveAudioInCurrentTurn = true
+                        try { tts?.stop() } catch (_: Exception) {}
+                        ttsCallbacks.clear()
+                    }
                     com.jarvis.assistant.audio.WakeWordManager.transitionTo(com.jarvis.assistant.audio.VoiceCycleState.SPEAKING, "Audio playback started")
                     setConversationState(ConversationState.SPEAKING)
                 } else {
+                    synchronized(voiceOutputLock) {
+                        isGeminiLiveAudioActive = false
+                    }
                     lastPlaybackEndTime = System.currentTimeMillis()
                     finalizeTurn()
                     com.jarvis.assistant.audio.WakeWordManager.transitionTo(com.jarvis.assistant.audio.VoiceCycleState.RESUMING_WAKE_WORD, "Voice turn completed")
@@ -950,6 +982,14 @@ class JarvisConversationService : Service() {
                             thinkingTimeoutJob?.cancel()
                             thinkingTimeoutJob = null
                             lastResponseTimedOut = false
+
+                            synchronized(voiceOutputLock) {
+                                isGeminiLiveAudioActive = true
+                                hasLiveAudioInCurrentTurn = true
+                                // Stop any conflicting Android TTS voice immediately so ONLY Gemini Live voice is heard
+                                try { tts?.stop() } catch (_: Exception) {}
+                                ttsCallbacks.clear()
+                            }
                             if (suppressAudioUntilTurnComplete) {
                                 Log.w("JarvisService", "onAudioDataReceived: Audio suppressed (suppressAudioUntilTurnComplete=true)")
                                 return
@@ -1078,6 +1118,13 @@ class JarvisConversationService : Service() {
                         override fun onInterrupted() {
                             val hasHeadset = headsetAudioRouter?.isHeadsetConnected() == true
                             Log.w("JarvisService", "onInterrupted received from server (hasHeadset=$hasHeadset, state=${_conversationState.value})")
+                            synchronized(voiceOutputLock) {
+                                isGeminiLiveAudioActive = false
+                                hasLiveAudioInCurrentTurn = false
+                                audioPlayer?.flush()
+                                try { tts?.stop() } catch (_: Exception) {}
+                                ttsCallbacks.clear()
+                            }
                             val userTurnInProgress = hasSpeechInCurrentUtterance || currentTurnUserText.isNotBlank()
                             val isOwnAutoResumeInterrupt = autoResumeAwaitingResponse &&
                                 !userTurnInProgress
@@ -1739,8 +1786,13 @@ class JarvisConversationService : Service() {
                                             thinkingTimeoutJob?.cancel()
                                             thinkingTimeoutJob = serviceScope.launch {
                                                 delay(6000)
-                                                if (_conversationState.value == ConversationState.THINKING && (audioPlayer == null || !audioPlayer!!.isPlaying())) {
+                                                if (_conversationState.value == ConversationState.THINKING &&
+                                                    (audioPlayer == null || !audioPlayer!!.isPlaying()) &&
+                                                    !hasLiveAudioInCurrentTurn
+                                                ) {
                                                     Log.i("JarvisService", "Gemini Live silent or delayed. Executing GeminiRestClient fallback for: '$userQuery'")
+                                                    // Abort Gemini Live so late streaming audio cannot collide with REST TTS
+                                                    liveWebSocket?.abortTurn()
 
                                                     val app = application as? JarvisApp
                                                     val apiKey = app?.preferences?.apiKey?.trim().orEmpty()
@@ -2197,6 +2249,15 @@ class JarvisConversationService : Service() {
                         val message = args.optString("message", "").trim()
                         val appNumber = if (args.has("app_number")) args.optInt("app_number", 1) else null
 
+                        // Idempotency check: Already sent recently?
+                        if (com.jarvis.assistant.security.IntelligentConfirmationManager.isRecentlyExecuted("WHATSAPP", recipient, message)) {
+                            Log.i("JarvisService", "send_whatsapp_message: Idempotency filter matched! Already sent to $recipient.")
+                            result.put("success", true)
+                            result.put("sent", true)
+                            result.put("message", "Message sent successfully.")
+                            return@withTimeout
+                        }
+
                         // Strict MessageExecutionGate Check
                         val hasGateApproval = com.jarvis.assistant.security.MessageExecutionGate.hasPendingConfirmation() &&
                                 com.jarvis.assistant.security.MessageExecutionGate.activeDraft.value?.isAuthorized == true
@@ -2211,8 +2272,12 @@ class JarvisConversationService : Service() {
                             result.put("requires_confirmation", true)
                             result.put("spoken_prompt", staging.spokenPrompt)
                             result.put("message", staging.spokenPrompt)
-                            speakImmediateVoiceResponse(staging.spokenPrompt) {
-                                com.jarvis.assistant.island.OriginIslandController.startListening(this@JarvisConversationService)
+                            // Single Voice Output: If Gemini Live is active, Gemini Live will voice the prompt.
+                            // Only speak via local TTS if Gemini Live is offline.
+                            if (liveWebSocket?.isSessionReady() != true) {
+                                speakImmediateVoiceResponse(staging.spokenPrompt) {
+                                    com.jarvis.assistant.island.OriginIslandController.startListening(this@JarvisConversationService)
+                                }
                             }
                             return@withTimeout
                         }
@@ -2704,6 +2769,13 @@ class JarvisConversationService : Service() {
                             val matches = if (senderQuery.isNotBlank()) com.jarvis.assistant.notification.NotificationRepository.getBySender(senderQuery) else com.jarvis.assistant.notification.NotificationRepository.getActiveList().filter { it.canReply }
                             val target = matches.firstOrNull()
                             if (target != null && target.replyAction != null) {
+                                // Idempotency check: Already sent reply recently?
+                                if (com.jarvis.assistant.security.IntelligentConfirmationManager.isRecentlyExecuted("NOTIFICATION_REPLY", target.sender, messageBody)) {
+                                    result.put("success", true)
+                                    result.put("message", "Reply already sent.")
+                                    return@withTimeout
+                                }
+
                                 val hasGateApproval = com.jarvis.assistant.security.MessageExecutionGate.hasPendingConfirmation() &&
                                         com.jarvis.assistant.security.MessageExecutionGate.activeDraft.value?.isAuthorized == true
 
@@ -2718,8 +2790,12 @@ class JarvisConversationService : Service() {
                                     result.put("requires_confirmation", true)
                                     result.put("spoken_prompt", staging.spokenPrompt)
                                     result.put("message", staging.spokenPrompt)
-                                    speakImmediateVoiceResponse(staging.spokenPrompt) {
-                                        com.jarvis.assistant.island.OriginIslandController.startListening(this@JarvisConversationService)
+                                    // Single Voice Output: If Gemini Live is active, Gemini Live will voice the prompt.
+                                    // Only speak via local TTS if Gemini Live is offline.
+                                    if (liveWebSocket?.isSessionReady() != true) {
+                                        speakImmediateVoiceResponse(staging.spokenPrompt) {
+                                            com.jarvis.assistant.island.OriginIslandController.startListening(this@JarvisConversationService)
+                                        }
                                     }
                                     return@withTimeout
                                 }
@@ -3305,6 +3381,10 @@ class JarvisConversationService : Service() {
         isCurrentTurnOwnerVoiceVerified = prefs == null || !prefs.isOwnerVoiceEnabled || !prefs.hasOwnerVoiceProfile() || isLeaseActive
         pendingToolCalls.clear()
         synchronized(currentUtteranceAudioStream) { currentUtteranceAudioStream.reset() }
+        synchronized(voiceOutputLock) {
+            isGeminiLiveAudioActive = false
+            hasLiveAudioInCurrentTurn = false
+        }
     }
 
     private fun stopActiveConversation() {

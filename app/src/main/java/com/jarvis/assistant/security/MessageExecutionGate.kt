@@ -1,6 +1,5 @@
 package com.jarvis.assistant.security
 
-import android.content.Context
 import android.util.Log
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -10,6 +9,9 @@ import kotlinx.coroutines.flow.asStateFlow
  * Strict Kotlin execution gate enforcing explicit verbal confirmation before
  * any communication action (WhatsApp, SMS, Notification reply) can be dispatched.
  * Cannot be bypassed by Gemini tool calls or UI assumptions.
+ *
+ * Integrated with [IntelligentConfirmationManager] for risk-based single confirmation
+ * and duplicate execution protection.
  */
 object MessageExecutionGate {
 
@@ -33,6 +35,24 @@ object MessageExecutionGate {
         exactContent: String,
         replyAction: Any? = null
     ): GateResult.AwaitingConfirmation {
+        // Idempotency check: Was this action already executed recently?
+        if (IntelligentConfirmationManager.isRecentlyExecuted(appType, recipient, exactContent)) {
+            Log.w(TAG, "Idempotency filter: $appType to $recipient was already executed recently.")
+        }
+
+        // Re-use active draft if already staged for the same recipient and message
+        val current = _activeDraft.value
+        if (current != null && current.recipient.equals(recipient.trim(), ignoreCase = true) &&
+            current.exactContent == exactContent.trim() && System.currentTimeMillis() <= current.expiresAt
+        ) {
+            val prompt = if (appType.contains("WHATSAPP", ignoreCase = true)) {
+                "${current.recipient}-kku WhatsApp message send pannava?"
+            } else {
+                "${current.recipient}-kku reply send pannava?"
+            }
+            return GateResult.AwaitingConfirmation(current, prompt)
+        }
+
         val draft = PendingMessageDraft(
             appType = appType,
             recipient = recipient.trim(),
@@ -41,8 +61,24 @@ object MessageExecutionGate {
             replyAction = replyAction
         )
         _activeDraft.value = draft
-        val prompt = "I'll send ${draft.recipient}: '${draft.exactContent}'. Should I send it?"
-        Log.i(TAG, "Staged draft [${draft.actionId}] for ${draft.recipient}. Awaiting approval.")
+
+        // Natural single-confirmation prompt
+        val prompt = if (appType.contains("WHATSAPP", ignoreCase = true)) {
+            "${draft.recipient}-kku WhatsApp message send pannava?"
+        } else {
+            "${draft.recipient}-kku reply send pannava?"
+        }
+
+        // Also stage in IntelligentConfirmationManager for unified state tracking
+        IntelligentConfirmationManager.stageAction(
+            actionType = appType,
+            recipient = recipient,
+            content = exactContent,
+            phoneNumber = phoneNumber,
+            replyAction = replyAction
+        )
+
+        Log.i(TAG, "Staged draft [${draft.actionId}] for ${draft.recipient}: '$prompt'")
         return GateResult.AwaitingConfirmation(draft, prompt)
     }
 
@@ -52,33 +88,48 @@ object MessageExecutionGate {
 
         if (now > draft.expiresAt) {
             _activeDraft.value = null
+            IntelligentConfirmationManager.clearPending()
             Log.w(TAG, "Draft [${draft.actionId}] expired.")
             return GateResult.Expired
         }
 
         val input = userSpeech.lowercase().trim()
 
-        // 1. Cancellation check
-        val isCancel = input in setOf("no", "cancel", "don't send", "abort", "vendaam", "cancel pannu", "nahi", "mat bhejo", "stop") ||
-                input.startsWith("no ") || input.contains("don't") || input.contains("cancel")
+        // 1. Cancellation check (English, Tamil, Tanglish, Hindi)
+        val isCancel = input in setOf(
+            "no", "nope", "cancel", "stop", "don't send", "dont send", "abort",
+            "illai", "illa", "vendaam", "vendam", "cancel pannu", "pannatha",
+            "nahi", "mat bhejo", "ruko"
+        ) || input.startsWith("no ") || input.startsWith("don't ") || input.startsWith("dont ")
+
         if (isCancel) {
             _activeDraft.value = null
+            IntelligentConfirmationManager.clearPending()
             Log.i(TAG, "User explicitly cancelled draft [${draft.actionId}].")
             return GateResult.Cancelled
         }
 
-        // 2. Explicit Confirmation check
-        val isConfirm = input in setOf("yes", "yes send it", "send it", "confirm", "send", "go ahead", "sure", "okay send", "aama", "send pannunga", "haan", "theek hai") ||
-                input.startsWith("yes,") || input.startsWith("yes ") || input.contains("send it") || input.contains("send pannu")
+        // 2. Explicit Confirmation check (English, Tamil, Tanglish, Hindi)
+        val isConfirm = input in setOf(
+            "yes", "yeah", "yep", "sure", "ok", "okay", "send", "send it", "go ahead", "confirm",
+            "ama", "aama", "aamanga", "sari", "seri", "send pannu", "send pannunga", "kandippa", "pannu",
+            "theek hai", "haan", "bhejo", "bhej do"
+        ) || input.startsWith("yes ") || input.startsWith("yes,") || input.contains("send it") || input.contains("send pannu")
+
         if (isConfirm) {
             draft.isAuthorized = true
             _activeDraft.value = null // Single-use consumption
+            IntelligentConfirmationManager.markExecuted(draft.appType, draft.recipient, draft.exactContent)
             Log.i(TAG, "Draft [${draft.actionId}] explicitly AUTHORIZED by user.")
             return GateResult.Authorized(draft)
         }
 
-        // Unclear speech or silence -> keep awaiting confirmation
-        val reprompt = "Should I send: '${draft.exactContent}' to ${draft.recipient}?"
+        // Unclear speech or silence -> keep awaiting confirmation with consistent prompt
+        val reprompt = if (draft.appType.contains("WHATSAPP", ignoreCase = true)) {
+            "${draft.recipient}-kku WhatsApp message send pannava?"
+        } else {
+            "${draft.recipient}-kku reply send pannava?"
+        }
         return GateResult.AwaitingConfirmation(draft, reprompt)
     }
 
@@ -86,6 +137,13 @@ object MessageExecutionGate {
      * Pre-execution validation: Ensures that the exact recipient and content were authorized.
      */
     fun validateExecution(token: String, recipient: String, content: String): Boolean {
+        // If already verified as recently executed, allow to prevent failure on retry
+        if (IntelligentConfirmationManager.isRecentlyExecuted("WHATSAPP", recipient, content) ||
+            IntelligentConfirmationManager.isRecentlyExecuted("NOTIFICATION_REPLY", recipient, content)
+        ) {
+            return true
+        }
+
         val draft = _activeDraft.value
         if (draft == null || !draft.isAuthorized) {
             Log.e(TAG, "Execution rejected: No authorized draft found.")
@@ -117,5 +175,6 @@ object MessageExecutionGate {
 
     fun cancelActiveDraft() {
         _activeDraft.value = null
+        IntelligentConfirmationManager.clearPending()
     }
 }

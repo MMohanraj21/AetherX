@@ -1,8 +1,13 @@
 package com.jarvis.assistant.orchestrator
 
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import android.util.Log
+import com.jarvis.assistant.automation.command.CommandParser
+import com.jarvis.assistant.automation.command.JarvisCommand
 import com.jarvis.assistant.automation.modes.SmartAutomationEngine
+import com.jarvis.assistant.automation.phone.PhoneControlManager
 import com.jarvis.assistant.conversation.ConversationalReasoningEngine
 import com.jarvis.assistant.emergency.EmergencyAssistant
 import com.jarvis.assistant.media.UniversalMediaController
@@ -10,12 +15,21 @@ import com.jarvis.assistant.notification.NotificationContextProvider
 import com.jarvis.assistant.notification.NotificationEventManager
 import com.jarvis.assistant.offline.OfflineAIEngine
 import com.jarvis.assistant.offline.OfflineIntentClassifier
+import com.jarvis.assistant.security.IntelligentConfirmationManager
 import com.jarvis.assistant.security.MessageExecutionGate
 import com.jarvis.assistant.telecom.CallAssistantManager
+import com.jarvis.assistant.util.ActivityLauncherHelper
+import java.net.URLEncoder
+import java.util.Locale
 
 /**
  * Unified central intelligence orchestrator coordinating device domains, continuous conversation context,
  * notifications, telecom actions, conversational reasoning, and high-level autonomous tasks.
+ *
+ * Implements Risk-Based Single Confirmation Policy:
+ * - Category A: Zero confirmation (Open apps, YouTube, Media, Flashlight, Time, Volume)
+ * - Category B: Single confirmation (WhatsApp, Notification reply, SMS) -> Asks once, executes on YES.
+ * - Category C: Strong confirmation (Sensitive / destructive operations)
  */
 class ZaraAIOrchestrator(private val context: Context) {
 
@@ -38,13 +52,14 @@ class ZaraAIOrchestrator(private val context: Context) {
     private val automationEngine = SmartAutomationEngine(context)
     private val emergencyAssistant = EmergencyAssistant(context)
     private val reasoningEngine = ConversationalReasoningEngine.getInstance(context)
+    private val phoneControlManager = PhoneControlManager(context)
 
     /**
      * Attempts to resolve and execute intent through specialized local domains first.
      * Returns true if handled directly; returns false if query should stream to Gemini Live.
      */
     fun processVoiceUtterance(utterance: String, onVocalFeedback: (String) -> Unit): Boolean {
-        // Priority 1: Strict MessageExecutionGate Confirmation / Cancellation
+        // Priority 1: Strict Single Confirmation Gate (Category B Actions)
         if (MessageExecutionGate.hasPendingConfirmation()) {
             val gateResult = MessageExecutionGate.handleUserVoiceTurn(utterance)
             return when (gateResult) {
@@ -53,20 +68,20 @@ class ZaraAIOrchestrator(private val context: Context) {
                     when (draft.appType) {
                         "WHATSAPP" -> {
                             com.jarvis.assistant.util.WhatsAppMessenger.sendMessage(context, draft.recipient, draft.exactContent, 1, confirmed = true)
-                            onVocalFeedback("Your message to ${draft.recipient} was submitted successfully.")
+                            onVocalFeedback("Message sent successfully.")
                         }
                         "NOTIFICATION_REPLY" -> {
                             val notifAction = (draft.replyAction as? com.jarvis.assistant.notification.NotificationReplyManager.ReplyableAction)
                             if (notifAction != null) {
                                 val ok = com.jarvis.assistant.notification.NotificationReplyManager.sendReply(context, notifAction, draft.exactContent)
-                                onVocalFeedback(if (ok) "Your reply was submitted successfully." else "Could not submit reply.")
+                                onVocalFeedback(if (ok) "Message sent successfully." else "Could not submit reply.")
                             }
                         }
                     }
                     true
                 }
                 is MessageExecutionGate.GateResult.Cancelled -> {
-                    onVocalFeedback("Cancelled. I haven't sent anything.")
+                    onVocalFeedback("Okay, message cancelled.")
                     true
                 }
                 is MessageExecutionGate.GateResult.Expired -> {
@@ -81,7 +96,41 @@ class ZaraAIOrchestrator(private val context: Context) {
             }
         }
 
-        // Priority 2: Incoming Call priority
+        // Priority 2: Category A Direct Execution (Zero Confirmation Needed)
+        // High-speed local execution (< 50ms): Open Instagram, Open ChatGPT, Open YouTube, etc.
+        val parsed = CommandParser.parse(utterance)
+        if (parsed.command != null && parsed.confidence >= 0.90f) {
+            when (val cmd = parsed.command) {
+                is JarvisCommand.OpenApp -> {
+                    val feedback = phoneControlManager.openApp(cmd.packageName)
+                    onVocalFeedback(feedback)
+                    return true
+                }
+                is JarvisCommand.PlayYouTube -> {
+                    val q = cmd.query
+                    val uri = Uri.parse("https://www.youtube.com/results?search_query=" + URLEncoder.encode(q, "UTF-8"))
+                    val ytIntent = Intent(Intent.ACTION_VIEW, uri).apply {
+                        setPackage("com.google.android.youtube")
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                    val launched = ActivityLauncherHelper.startActivitySafely(context, ytIntent)
+                    if (!launched) {
+                        phoneControlManager.openUrl("https://www.youtube.com/results?search_query=" + URLEncoder.encode(q, "UTF-8"))
+                    }
+                    onVocalFeedback("Playing $q on YouTube.")
+                    return true
+                }
+                else -> {}
+            }
+        }
+
+        // Priority 3: Category B Staging for Explicit WhatsApp Messages
+        // Example: "Send a WhatsApp message to Rahul saying I will come tomorrow"
+        if (tryParseAndStageWhatsAppMessage(utterance, onVocalFeedback)) {
+            return true
+        }
+
+        // Priority 4: Incoming Call & Notification priority
         val hasCall = callManager.hasActiveRingingCall()
         val hasNotif = NotificationEventManager.hasPendingReply()
 
@@ -123,7 +172,7 @@ class ZaraAIOrchestrator(private val context: Context) {
             IntentRouter.TargetDomain.GENERATIVE_AI -> {}
         }
 
-        // Priority 3: Conversational Reasoning Engine (Clarification & Multi-turn evaluation)
+        // Priority 5: Conversational Reasoning Engine (Clarification & Multi-turn evaluation)
         val reasoning = reasoningEngine.evaluate(utterance)
         when (reasoning) {
             is ConversationalReasoningEngine.ReasoningResult.SpeakClarification -> {
@@ -145,6 +194,51 @@ class ZaraAIOrchestrator(private val context: Context) {
                 return false
             }
         }
+    }
+
+    private fun tryParseAndStageWhatsAppMessage(utterance: String, onFeedback: (String) -> Unit): Boolean {
+        val clean = utterance.trim()
+        val lower = clean.lowercase(Locale.ROOT)
+
+        val isWhatsAppRequest = lower.contains("whatsapp") &&
+                (lower.contains("message") || lower.contains("send") || lower.contains("anupu") || lower.contains("solli") || lower.contains("podu"))
+        if (!isWhatsAppRequest) return false
+
+        // Pattern 1: English: "Send a WhatsApp message to Rahul saying I will come tomorrow"
+        val pattern1 = Regex("(?:send\\s+(?:a\\s+)?)?whatsapp(?:\\s+message)?\\s+to\\s+([a-zA-Z0-9\\s]+?)\\s+(?:saying|that)\\s+(.+)", RegexOption.IGNORE_CASE)
+        val match1 = pattern1.find(clean)
+        if (match1 != null) {
+            val recipient = match1.groupValues[1].trim()
+            val content = match1.groupValues[2].trim()
+            if (recipient.isNotBlank() && content.isNotBlank()) {
+                val staging = MessageExecutionGate.stageDraft(
+                    appType = "WHATSAPP",
+                    recipient = recipient,
+                    exactContent = content
+                )
+                onFeedback(staging.spokenPrompt)
+                return true
+            }
+        }
+
+        // Pattern 2: Tanglish: "Rahul-kku WhatsApp message send pannu I will come tomorrow"
+        val pattern2 = Regex("([a-zA-Z0-9]+)(?:-kku|-ku|\\s+kku|\\s+ku)\\s+whatsapp(?:\\s+message)?(?:\\s+send\\s+pannu)?\\s+(?:solli\\s+)?(.+)", RegexOption.IGNORE_CASE)
+        val match2 = pattern2.find(clean)
+        if (match2 != null) {
+            val recipient = match2.groupValues[1].trim()
+            val content = match2.groupValues[2].trim()
+            if (recipient.isNotBlank() && content.isNotBlank()) {
+                val staging = MessageExecutionGate.stageDraft(
+                    appType = "WHATSAPP",
+                    recipient = recipient,
+                    exactContent = content
+                )
+                onFeedback(staging.spokenPrompt)
+                return true
+            }
+        }
+
+        return false
     }
 
     private fun handleMediaVoiceCommand(query: String, onFeedback: (String) -> Unit): Boolean {

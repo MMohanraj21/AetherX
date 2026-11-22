@@ -46,10 +46,14 @@ class ConversationalReasoningEngine(private val context: Context) {
                 val recipient = payload["recipient"]
                 val content = payload["content"]
                 if (!recipient.isNullOrBlank() && !content.isNullOrBlank()) {
-                    // Both fields now resolved! Generate draft & ask final confirmation
-                    val prompt = "I'll send $recipient: '$content'. Should I send it?"
+                    // Both fields now resolved! Stage single confirmation draft
+                    val staging = com.jarvis.assistant.security.MessageExecutionGate.stageDraft(
+                        appType = "WHATSAPP",
+                        recipient = recipient,
+                        exactContent = content
+                    )
                     ConversationStateManager.recordEntity(ConversationStateManager.EntityType.PERSON_CONTACT, recipient, recipient)
-                    return ReasoningResult.SpeakConfirmation(prompt, "AUTH_${System.currentTimeMillis()}")
+                    return ReasoningResult.SpeakConfirmation(staging.spokenPrompt, staging.draft.authToken)
                 } else if (!recipient.isNullOrBlank() && content.isNullOrBlank()) {
                     // Recipient obtained, now ask for message
                     ConversationStateManager.recordEntity(ConversationStateManager.EntityType.PERSON_CONTACT, recipient, recipient)
