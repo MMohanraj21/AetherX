@@ -872,8 +872,10 @@ class JarvisConversationService : Service() {
         hasSignalledUtteranceEnd = false
         currentTurnAssistantText.clear()
         currentTurnUserText.clear()
+        acquireWakeLock()
+        com.jarvis.assistant.conversation.ContinuousConversationManager.startSession()
         startInactivityTimer()
-        setConversationState(ConversationState.IDLE)
+        setConversationState(ConversationState.LISTENING)
         updateNotification()
         headsetAudioRouter?.start()
 
@@ -886,6 +888,7 @@ class JarvisConversationService : Service() {
                         try { tts?.stop() } catch (_: Exception) {}
                         ttsCallbacks.clear()
                     }
+                    com.jarvis.assistant.conversation.ContinuousConversationManager.onSpeaking()
                     com.jarvis.assistant.audio.WakeWordManager.transitionTo(com.jarvis.assistant.audio.VoiceCycleState.SPEAKING, "Audio playback started")
                     setConversationState(ConversationState.SPEAKING)
                 } else {
@@ -894,21 +897,14 @@ class JarvisConversationService : Service() {
                     }
                     lastPlaybackEndTime = System.currentTimeMillis()
                     finalizeTurn()
+                    com.jarvis.assistant.conversation.ContinuousConversationManager.onPlaybackFinished()
                     com.jarvis.assistant.audio.WakeWordManager.transitionTo(com.jarvis.assistant.audio.VoiceCycleState.RESUMING_WAKE_WORD, "Voice turn completed")
                     if (_isSessionOn.value) {
+                        // UNLIMITED CONTINUOUS CONVERSATION:
+                        // Maintain LISTENING mode indefinitely. The microphone remains active for uninterrupted conversation
+                        // until the user explicitly issues a verbal STOP command or manually ends the session.
                         setConversationState(ConversationState.LISTENING)
-                        val isForeground = com.jarvis.assistant.JarvisApp.isAppForeground.value
-                        if (!isForeground && preferences.isWakeWordEnabled) {
-                            serviceScope.launch(Dispatchers.Main) {
-                                delay(15_000L) // 15-second natural follow-up conversation window
-                                if (_isSessionOn.value && _conversationState.value == ConversationState.LISTENING &&
-                                    !hasSpeechInCurrentUtterance &&
-                                    (System.currentTimeMillis() - lastUserSpeechDetectedTime) >= 14_000L) {
-                                    enterStandby(announce = false)
-                                    com.jarvis.assistant.audio.WakeWordManager.logEvent("WAKEWORD_RECOVERED", "Resumed standby after natural conversation follow-up window")
-                                }
-                            }
-                        }
+                        Log.d("JarvisService", "Speech playback complete. Continuous conversation listening for user's next utterance.")
                     }
                 }
             },
@@ -960,7 +956,7 @@ class JarvisConversationService : Service() {
                                 autonomousLoopJob?.cancel()
                                 autonomousLoopJob = null
                                 if (_conversationState.value != ConversationState.SPEAKING && _conversationState.value != ConversationState.THINKING) {
-                                    setConversationState(ConversationState.IDLE)
+                                    setConversationState(if (_isSessionOn.value) ConversationState.LISTENING else ConversationState.IDLE)
                                 }
                                 val pendingCmd = pendingCommandUtterance
                                 if (pendingCmd != null) {
@@ -1101,15 +1097,19 @@ class JarvisConversationService : Service() {
                             lastResponseTimedOut = false
                             updateNotification()
                             val userText = currentTurnUserText.toString().lowercase(Locale.ROOT)
+                            if (com.jarvis.assistant.conversation.ContinuousConversationManager.isExplicitSessionStopCommand(userText) || isExplicitStandbyCommand(userText)) {
+                                Log.i("JarvisService", "Detected explicit STOP / standby command in user speech: '$userText'. Concluding conversation gracefully.")
+                                cancelAllActiveTools()
+                                val farewell = com.jarvis.assistant.conversation.ContinuousConversationManager.getFarewellResponse(userText)
+                                speakImmediateVoiceResponse(farewell) {
+                                    minimizeToHomeScreen()
+                                    enterStandby(announce = false)
+                                }
+                                return
+                            }
                             if (isStopCommand(userText)) {
                                 Log.i("JarvisService", "Detected explicit stop/cancel in user speech: '$userText'. Aborting all tasks.")
                                 cancelAllActiveTools()
-                            }
-                            if (isExplicitStandbyCommand(userText)) {
-                                Log.i("JarvisService", "Detected explicit background / standby command in user speech: '$userText'")
-                                minimizeToHomeScreen()
-                                enterStandby(announce = true)
-                                return
                             }
                             app.memoryManager.learnPreferencesFromConversation(currentTurnUserText.toString())
                             // Do not run checkAndExecuteCommand on streaming chunks mid-speech!
@@ -1521,6 +1521,18 @@ class JarvisConversationService : Service() {
             if (_isSessionOn.value) {
                 val now = System.currentTimeMillis()
 
+                // Active phone call protection (privacy pause and automatic resume)
+                if (isPhoneCallActive()) {
+                    com.jarvis.assistant.conversation.ContinuousConversationManager.onPhoneCallStarted()
+                    consecutiveVoicedFrames = 0
+                    return@AudioRecorder
+                } else if (com.jarvis.assistant.conversation.ContinuousConversationManager.isPhoneCallPaused()) {
+                    com.jarvis.assistant.conversation.ContinuousConversationManager.onPhoneCallEnded()
+                    if (_conversationState.value != ConversationState.SPEAKING) {
+                        setConversationState(ConversationState.LISTENING)
+                    }
+                }
+
                 // Acoustic Echo Decay Protection (AEDP):
                 // For 150ms after speaker audio stops, discard mic chunks so room reverberation
                 // does not bounce into Gemini Live and cause false self-interruption.
@@ -1607,6 +1619,7 @@ class JarvisConversationService : Service() {
                             hasExecutedCommandInCurrentTurn = false
                             totalVoicedFramesInCurrentUtterance = 0
                             liveWebSocket?.sendActivityStart()
+                            com.jarvis.assistant.conversation.ContinuousConversationManager.onUserSpeechDetected()
                             com.jarvis.assistant.audio.WakeWordManager.transitionTo(com.jarvis.assistant.audio.VoiceCycleState.TRANSCRIBING, "User speech detected")
                             synchronized(currentUtteranceAudioStream) {
                                 currentUtteranceAudioStream.reset()
@@ -1841,10 +1854,10 @@ class JarvisConversationService : Service() {
                                                         }
                                                     }
 
-                                                    // Fallback if network completely down
-                                                    Log.i("JarvisService", "Response timeout; returning to IDLE")
-                                                    setConversationState(ConversationState.IDLE)
-                                                    com.jarvis.assistant.island.OriginIslandController.updateVoiceState(this@JarvisConversationService, ConversationState.IDLE)
+                                                    // Fallback if network temporarily down or response timed out
+                                                    Log.i("JarvisService", "Response timeout; maintaining active continuous listening")
+                                                    setConversationState(ConversationState.LISTENING)
+                                                    com.jarvis.assistant.island.OriginIslandController.updateVoiceState(this@JarvisConversationService, ConversationState.LISTENING)
                                                     lastResponseTimedOut = true
                                                     updateNotification()
                                                     val errorMsg = if (userQuery.isNotBlank()) {
@@ -1853,17 +1866,10 @@ class JarvisConversationService : Service() {
                                                         "I'm ready. Please speak your request."
                                                     }
                                                     speakImmediateVoiceResponse(errorMsg) {
-                                                        setConversationState(ConversationState.IDLE)
-                                                        com.jarvis.assistant.island.OriginIslandController.updateVoiceState(this@JarvisConversationService, ConversationState.IDLE)
+                                                        setConversationState(ConversationState.LISTENING)
+                                                        com.jarvis.assistant.island.OriginIslandController.updateVoiceState(this@JarvisConversationService, ConversationState.LISTENING)
                                                     }
                                                     serviceScope.launch { _events.emit(errorMsg) }
-                                                    if (!com.jarvis.assistant.JarvisApp.isAppForeground.value && preferences.isWakeWordEnabled) {
-                                                        serviceScope.launch(Dispatchers.Main) {
-                                                            delay(1500L)
-                                                            enterStandby(announce = false)
-                                                            com.jarvis.assistant.audio.WakeWordManager.logEvent("WAKEWORD_RECOVERED", "Recovered standby after timeout")
-                                                        }
-                                                    }
                                                 }
                                             }
                                         }
@@ -3424,15 +3430,18 @@ class JarvisConversationService : Service() {
         _connectionStatus.value = "READY"
         _audioLevel.value = 0f
         headsetAudioRouter?.stop()
+        com.jarvis.assistant.conversation.ContinuousConversationManager.reset()
     }
 
     private fun startInactivityTimer() {
         inactivityJob?.cancel()
         inactivityJob = serviceScope.launch {
             while (isActive && _isSessionOn.value) {
-                delay(15_000)
-                if (System.currentTimeMillis() - lastUserSpeechDetectedTime >= INACTIVITY_TIMEOUT_MS) {
-                    enterStandby(announce = false)
+                delay(60_000L)
+                // Continuous Conversation: Maintain WakeLock and WifiLock health.
+                // Zara never times out silently or exits active conversation automatically.
+                if (_isSessionOn.value && wakeLock?.isHeld != true) {
+                    acquireWakeLock()
                 }
             }
         }
@@ -3816,15 +3825,10 @@ class JarvisConversationService : Service() {
                 com.jarvis.assistant.island.OriginIslandController.startListening(this)
                 lastUserSpeechDetectedTime = System.currentTimeMillis()
 
-                serviceScope.launch(Dispatchers.Main) {
-                    delay(15_000L) // 15-second natural follow-up conversation window
-                    if (_isSessionOn.value && _conversationState.value == ConversationState.LISTENING &&
-                        !hasSpeechInCurrentUtterance &&
-                        (System.currentTimeMillis() - lastUserSpeechDetectedTime) >= 14_000L) {
-                        Log.i("ZaraAssistant", "Follow-up conversation window elapsed. Transitioning smoothly to standby.")
-                        enterStandby(announce = false)
-                    }
-                }
+                // UNLIMITED CONTINUOUS CONVERSATION:
+                // Keep the microphone active and listening continuously for follow-up speech
+                // without terminating the conversation or forcing the user to say "Hey ZARA" again.
+                Log.i("ZaraAssistant", "Command executed. Continuous conversation active: listening for follow-up speech.")
                 return
             }
         }
