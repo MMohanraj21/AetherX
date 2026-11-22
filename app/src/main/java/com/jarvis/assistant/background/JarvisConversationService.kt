@@ -598,7 +598,7 @@ class JarvisConversationService : Service() {
         try {
             tts = TextToSpeech(applicationContext) { status ->
                 if (status == TextToSpeech.SUCCESS) {
-                    tts?.language = Locale.US
+                    com.jarvis.assistant.audio.ZaraVoicePreferenceManager.applyVoiceToTts(this@JarvisConversationService, tts)
                     tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
                         override fun onStart(utteranceId: String?) {
                             Log.d("JarvisService", "TTS onStart: $utteranceId")
@@ -664,6 +664,8 @@ class JarvisConversationService : Service() {
 
                     if (tts == null) {
                         initTts()
+                    } else {
+                        com.jarvis.assistant.audio.ZaraVoicePreferenceManager.applyVoiceToTts(this@JarvisConversationService, tts)
                     }
                     val utteranceId = "zara_voice_${System.currentTimeMillis()}"
                     if (onDone != null) {
@@ -930,7 +932,7 @@ class JarvisConversationService : Service() {
                 liveWebSocket = GeminiLiveWebSocket(
                     apiKey = apiKey,
                     model = preferences.aiModel,
-                    voiceName = preferences.voice,
+                    voiceName = com.jarvis.assistant.audio.ZaraVoicePreferenceManager.getGeminiVoiceName(this@JarvisConversationService),
                     systemPrompt = systemPrompt,
                     listener = object : GeminiLiveWebSocket.Listener {
                         override fun onConnectionStateChanged(status: String) {
@@ -1301,7 +1303,7 @@ class JarvisConversationService : Service() {
                                 val isLive = liveWebSocket?.isSessionReady() == true
                                 if (!preferences.isSilentExecutionMode && !isLive) {
                                     Log.i("JarvisService", "Offline fallback: Speaking confirmation via TTS: '$summaryToSpeak'")
-                                    tts?.speak(summaryToSpeak, TextToSpeech.QUEUE_FLUSH, null, "task_done")
+                                    speakImmediateVoiceResponse(summaryToSpeak)
                                 }
                             }
 
@@ -2631,7 +2633,7 @@ class JarvisConversationService : Service() {
                                 if (!alreadySpoke && liveWebSocket?.isSessionReady() != true) {
                                     // Offline fallback: speak via TTS only when Gemini Live is offline
                                     lastCompletedTaskSummary = null
-                                    tts?.speak(summary, TextToSpeech.QUEUE_FLUSH, null, "task_done")
+                                    speakImmediateVoiceResponse(summary)
                                 }
                             }
                         }
@@ -3887,54 +3889,8 @@ class JarvisConversationService : Service() {
             } catch (e: Exception) {
                 Log.w("JarvisService", "Direct background startActivity restricted: ${e.message}")
             }
-
-            // High-priority fullScreenIntent Heads-Up alert (works over WhatsApp, Chrome, Home Screen & Lock Screen)
-            postWakeHeadsUpAlert(activityIntent)
         } catch (e: Exception) {
             Log.e("JarvisService", "Error launching assistant UI from background: ${e.message}", e)
-        }
-    }
-
-    private fun postWakeHeadsUpAlert(activityIntent: Intent) {
-        try {
-            val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager ?: return
-            val channelId = "zara_wake_alert"
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                val channel = NotificationChannel(
-                    channelId,
-                    "Zara Wake Activation",
-                    NotificationManager.IMPORTANCE_HIGH
-                ).apply {
-                    description = "Instant voice activation alert for Zara AI"
-                    setSound(null, null)
-                    enableVibration(false)
-                    lockscreenVisibility = android.app.Notification.VISIBILITY_PUBLIC
-                }
-                notificationManager.createNotificationChannel(channel)
-            }
-
-            val fullScreenPendingIntent = PendingIntent.getActivity(
-                this,
-                9999,
-                activityIntent,
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-            )
-
-            val wakeAlert = NotificationCompat.Builder(this, channelId)
-                .setSmallIcon(android.R.drawable.ic_btn_speak_now)
-                .setContentTitle("Zara AI")
-                .setContentText("Listening… Speak your command")
-                .setPriority(NotificationCompat.PRIORITY_MAX)
-                .setCategory(NotificationCompat.CATEGORY_CALL)
-                .setFullScreenIntent(fullScreenPendingIntent, true)
-                .setContentIntent(fullScreenPendingIntent)
-                .setAutoCancel(true)
-                .setTimeoutAfter(6000L)
-                .build()
-
-            notificationManager.notify(9999, wakeAlert)
-        } catch (e: Exception) {
-            Log.w("JarvisService", "Failed to post wake heads-up alert: ${e.message}")
         }
     }
 
@@ -4145,20 +4101,9 @@ class JarvisConversationService : Service() {
 
     private fun buildNotification(): android.app.Notification {
         val (title, text) = when {
-            _isStandby.value -> "Zara is in the background" to "Say \"Hey Zara\" to wake me up"
-            _isSessionOn.value && !_connectionStatus.value.equals("LIVE", ignoreCase = true) ->
-                "Zara is reconnecting" to "Connection: ${_connectionStatus.value}. Requests may not be heard yet."
-            _isSessionOn.value && lastResponseTimedOut ->
-                "Zara did not reply" to "Connection is active. Repeat your request."
-            _isSessionOn.value && _conversationState.value == ConversationState.SPEAKING ->
-                "Zara is replying" to "Audio response is playing"
-            _isSessionOn.value && _conversationState.value == ConversationState.THINKING ->
-                "Zara is thinking" to "Processing your request"
-            _isSessionOn.value && _conversationState.value == ConversationState.LISTENING ->
-                "Zara is listening" to "Speak your request now"
-            _isSessionOn.value ->
-                "Zara is ready" to "Connected. Say your request or \"Hey Zara\"."
-            else -> "Zara" to "Starting up\u2026"
+            _isStandby.value -> "ZARA AI" to "Standby • Say \"Hey Zara\""
+            _isSessionOn.value -> "ZARA AI" to "Microphone active"
+            else -> "ZARA AI" to "Active"
         }
         val contentIntent = PendingIntent.getActivity(
             this, 0, Intent(this, MainActivity::class.java),
@@ -4170,7 +4115,10 @@ class JarvisConversationService : Service() {
             .setContentText(text)
             .setContentIntent(contentIntent)
             .setOngoing(true)
+            .setOnlyAlertOnce(true)
+            .setPriority(NotificationCompat.PRIORITY_MIN)
             .setCategory(NotificationCompat.CATEGORY_SERVICE)
+            .setShowWhen(false)
             .addAction(0, "Stop", PendingIntent.getService(
                 this, 0, Intent(this, JarvisConversationService::class.java).setAction(ACTION_STOP_ALL),
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE

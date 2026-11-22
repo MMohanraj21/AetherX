@@ -57,6 +57,15 @@ object NotificationEventManager {
 
         val service = JarvisConversationService.activeInstance ?: return
 
+        // Notification Event Isolation:
+        // An incoming notification from WhatsApp, SMS, email, etc. MUST NOT:
+        // - Stop Zara, restart Zara, reset conversation, release microphone, or speak over the user!
+        // During an active continuous voice conversation, store silently in repository without interrupting.
+        if (JarvisConversationService.isSessionOn.value) {
+            Log.i(TAG, "Active conversation session in progress; notification from ${item.appName} isolated and recorded silently.")
+            return
+        }
+
         // Do not interrupt active phone call
         val telecomManager = context.getSystemService(Context.TELECOM_SERVICE) as? android.telecom.TelecomManager
         val telephonyManager = context.getSystemService(Context.TELEPHONY_SERVICE) as? android.telephony.TelephonyManager

@@ -186,13 +186,16 @@ object OriginIslandController {
         builder.apply {
             setSmallIcon(R.drawable.ic_zara_logo)
             setColor(if (isError) 0xFFEF4444.toInt() else 0xFF00E5FF.toInt())
-            setContentTitle(title)
-            setContentText(text)
+            setContentTitle("ZARA AI")
+            setContentText(if (isMedia) "$title - $text" else "Microphone active")
             if (batteryStr.isNotBlank()) {
                 setSubText(batteryStr)
             }
             setOngoing(true)
             setOnlyAlertOnce(true)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1) {
+                setShowWhen(false)
+            }
             setContentIntent(contentIntent)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
                 setVisibility(Notification.VISIBILITY_PUBLIC)
@@ -284,7 +287,7 @@ object OriginIslandController {
             putString("android.shortCriticalText", shortStatus)
             putBoolean("vivo.summary.ongoing", true)
             putString("vivo.summary.ongoing.text", shortStatus)
-            putString("vivo.summary.ongoing.title", title)
+            putString("vivo.summary.ongoing.title", if (isMedia) title else "ZARA AI")
             if (batteryStr.isNotBlank()) {
                 putString("vivo.summary.ongoing.subtext", batteryStr)
             }

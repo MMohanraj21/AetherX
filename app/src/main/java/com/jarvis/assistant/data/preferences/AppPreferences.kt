@@ -44,6 +44,7 @@ class AppPreferences(context: Context) {
         private const val KEY_API_KEY = "key_api_key"
         private const val KEY_MODEL = "key_model"
         private const val KEY_VOICE = "key_voice"
+        private const val KEY_VOICE_GENDER = "key_voice_gender"
         private const val KEY_PERSONALITY = "key_personality"
         private const val KEY_USER_NAME = "key_user_name"
         private const val KEY_MIC_MUTED = "key_mic_muted"
@@ -243,6 +244,10 @@ class AppPreferences(context: Context) {
     var voice: String
         get() = prefs.getString(KEY_VOICE, GeminiConstants.DEFAULT_VOICE) ?: GeminiConstants.DEFAULT_VOICE
         set(value) = prefs.edit().putString(KEY_VOICE, value).apply()
+
+    var voiceGender: String
+        get() = prefs.getString(KEY_VOICE_GENDER, "FEMALE") ?: "FEMALE"
+        set(value) = prefs.edit().putString(KEY_VOICE_GENDER, value).apply()
 
     var personality: String
         get() = prefs.getString(KEY_PERSONALITY, GeminiConstants.PERSONALITY_ASSISTANT) ?: GeminiConstants.PERSONALITY_ASSISTANT
