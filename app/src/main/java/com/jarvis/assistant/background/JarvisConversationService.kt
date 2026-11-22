@@ -1297,8 +1297,8 @@ class JarvisConversationService : Service() {
                             }
                             pendingToolCalls.clear()
 
-                            if (!lastCompletedTaskSummary.isNullOrBlank()) {
-                                val summaryToSpeak = lastCompletedTaskSummary
+                            val summaryToSpeak = lastCompletedTaskSummary
+                            if (!summaryToSpeak.isNullOrBlank()) {
                                 lastCompletedTaskSummary = null
                                 val isLive = liveWebSocket?.isSessionReady() == true
                                 if (!preferences.isSilentExecutionMode && !isLive) {
