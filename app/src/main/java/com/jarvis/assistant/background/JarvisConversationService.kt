@@ -1809,6 +1809,7 @@ class JarvisConversationService : Service() {
                                             }
                                         }
                                     }
+                                }
                             } else {
                                 // Short acoustic pop / ambient noise - return cleanly to IDLE
                                 hasSpeechInCurrentUtterance = false
