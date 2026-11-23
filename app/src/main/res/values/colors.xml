@@ -63,4 +63,17 @@
     <color name="naira_avatar_bg">#EFF6FF</color>
     <color name="naira_input_bg">#FFFFFF</color>
     <color name="naira_chip_bg">#F1F5F9</color>
+
+    <!-- OLED Voice Studio Palette -->
+    <color name="studio_bg_oled">#08080C</color>
+    <color name="studio_card_bg">#11121A</color>
+    <color name="studio_card_border">#1F2130</color>
+    <color name="studio_card_active_border">#7C4DFF</color>
+    <color name="studio_purple_accent">#7C4DFF</color>
+    <color name="studio_purple_bright">#9E75FF</color>
+    <color name="studio_purple_glow">#337C4DFF</color>
+    <color name="studio_active_badge_bg">#1E1A38</color>
+    <color name="studio_text_primary">#F1F5F9</color>
+    <color name="studio_text_secondary">#94A3B8</color>
+    <color name="studio_tab_inactive">#161722</color>
 </resources>

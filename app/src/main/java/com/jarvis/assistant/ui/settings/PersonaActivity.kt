@@ -74,6 +74,10 @@ class PersonaActivity : AppCompatActivity() {
             selectPersona(GeminiConstants.PERSONALITY_TECHGPT_X, updateVoiceDefault = true)
         }
 
+        binding.cardOpenVoiceStudio.setOnClickListener {
+            startActivity(android.content.Intent(this, com.jarvis.assistant.ui.voice.VoiceStudioActivity::class.java))
+        }
+
         binding.btnActivatePersona.setOnClickListener {
             saveAndActivate()
         }

@@ -243,17 +243,17 @@ class AppPreferences(context: Context) {
 
     var voice: String
         get() {
-            val v = prefs.getString(KEY_VOICE, GeminiConstants.DEFAULT_VOICE) ?: GeminiConstants.DEFAULT_VOICE
+            val v = prefs.getString(KEY_VOICE, "Sulafat") ?: "Sulafat"
             val gender = voiceGender
             return if (gender == "FEMALE") {
-                if (v.equals("Aoede", true) || v.equals("Kore", true) || v.equals("Leda", true)) v else "Aoede"
+                if (com.jarvis.assistant.audio.ZaraVoicePreferenceManager.isFemaleVoice(v)) v else "Sulafat"
             } else {
-                if (v.equals("Puck", true) || v.equals("Charon", true) || v.equals("Fenrir", true)) v else "Puck"
+                if (com.jarvis.assistant.audio.ZaraVoicePreferenceManager.isMaleVoice(v)) v else "Algieba"
             }
         }
         set(value) {
             val clean = value.trim()
-            val gender = if (clean.equals("Aoede", true) || clean.equals("Kore", true) || clean.equals("Leda", true)) {
+            val gender = if (com.jarvis.assistant.audio.ZaraVoicePreferenceManager.isFemaleVoice(clean)) {
                 "FEMALE"
             } else {
                 "MALE"
@@ -270,9 +270,9 @@ class AppPreferences(context: Context) {
             val gender = if (value.equals("MALE", ignoreCase = true)) "MALE" else "FEMALE"
             val currentVoice = prefs.getString(KEY_VOICE, "") ?: ""
             val resolvedVoice = if (gender == "FEMALE") {
-                if (currentVoice.equals("Aoede", true) || currentVoice.equals("Kore", true) || currentVoice.equals("Leda", true)) currentVoice else "Aoede"
+                if (com.jarvis.assistant.audio.ZaraVoicePreferenceManager.isFemaleVoice(currentVoice)) currentVoice else "Sulafat"
             } else {
-                if (currentVoice.equals("Puck", true) || currentVoice.equals("Charon", true) || currentVoice.equals("Fenrir", true)) currentVoice else "Puck"
+                if (com.jarvis.assistant.audio.ZaraVoicePreferenceManager.isMaleVoice(currentVoice)) currentVoice else "Algieba"
             }
             prefs.edit()
                 .putString(KEY_VOICE_GENDER, gender)

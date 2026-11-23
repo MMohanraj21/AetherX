@@ -19,27 +19,37 @@ class ZaraVoicePreferenceTest {
 
     @Test
     fun testFemaleVoiceIdentification() {
+        assertTrue(ZaraVoicePreferenceManager.isFemaleVoice("Sulafat"))
+        assertTrue(ZaraVoicePreferenceManager.isFemaleVoice("Achernar"))
         assertTrue(ZaraVoicePreferenceManager.isFemaleVoice("Aoede"))
-        assertTrue(ZaraVoicePreferenceManager.isFemaleVoice("Kore"))
-        assertTrue(ZaraVoicePreferenceManager.isFemaleVoice("aoede"))
-        assertTrue(ZaraVoicePreferenceManager.isFemaleVoice("kore"))
+        assertTrue(ZaraVoicePreferenceManager.isFemaleVoice("Vindemiatrix"))
+        assertTrue(ZaraVoicePreferenceManager.isFemaleVoice("Zephyr"))
+        assertTrue(ZaraVoicePreferenceManager.isFemaleVoice("sulafat"))
+        assertTrue(ZaraVoicePreferenceManager.isFemaleVoice("zephyr"))
 
-        assertFalse(ZaraVoicePreferenceManager.isFemaleVoice("Puck"))
+        assertFalse(ZaraVoicePreferenceManager.isFemaleVoice("Algieba"))
+        assertFalse(ZaraVoicePreferenceManager.isFemaleVoice("Achird"))
         assertFalse(ZaraVoicePreferenceManager.isFemaleVoice("Charon"))
-        assertFalse(ZaraVoicePreferenceManager.isFemaleVoice("Fenrir"))
+        assertFalse(ZaraVoicePreferenceManager.isFemaleVoice("Umbriel"))
+        assertFalse(ZaraVoicePreferenceManager.isFemaleVoice("Puck"))
         assertFalse(ZaraVoicePreferenceManager.isFemaleVoice("UnknownVoice"))
     }
 
     @Test
     fun testMaleVoiceIdentification() {
-        assertTrue(ZaraVoicePreferenceManager.isMaleVoice("Puck"))
+        assertTrue(ZaraVoicePreferenceManager.isMaleVoice("Algieba"))
+        assertTrue(ZaraVoicePreferenceManager.isMaleVoice("Achird"))
         assertTrue(ZaraVoicePreferenceManager.isMaleVoice("Charon"))
-        assertTrue(ZaraVoicePreferenceManager.isMaleVoice("Fenrir"))
+        assertTrue(ZaraVoicePreferenceManager.isMaleVoice("Umbriel"))
+        assertTrue(ZaraVoicePreferenceManager.isMaleVoice("Puck"))
+        assertTrue(ZaraVoicePreferenceManager.isMaleVoice("algieba"))
         assertTrue(ZaraVoicePreferenceManager.isMaleVoice("puck"))
-        assertTrue(ZaraVoicePreferenceManager.isMaleVoice("charon"))
 
+        assertFalse(ZaraVoicePreferenceManager.isMaleVoice("Sulafat"))
+        assertFalse(ZaraVoicePreferenceManager.isMaleVoice("Achernar"))
         assertFalse(ZaraVoicePreferenceManager.isMaleVoice("Aoede"))
-        assertFalse(ZaraVoicePreferenceManager.isMaleVoice("Kore"))
+        assertFalse(ZaraVoicePreferenceManager.isMaleVoice("Vindemiatrix"))
+        assertFalse(ZaraVoicePreferenceManager.isMaleVoice("Zephyr"))
         assertFalse(ZaraVoicePreferenceManager.isMaleVoice("UnknownVoice"))
     }
 

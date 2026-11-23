@@ -25,8 +25,7 @@ import android.os.PowerManager
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
-import android.speech.tts.TextToSpeech
-import android.speech.tts.UtteranceProgressListener
+
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.jarvis.assistant.JarvisApp
@@ -242,6 +241,7 @@ class JarvisConversationService : Service() {
     private var audioRecorder: AudioRecorder? = null
     private var audioPlayer: AudioPlayer? = null
     private var liveWebSocket: GeminiLiveWebSocket? = null
+    fun getLiveWebSocket(): GeminiLiveWebSocket? = liveWebSocket
     private var inactivityJob: Job? = null
     private val currentTurnAssistantText = StringBuilder()
     private val currentTurnUserText = StringBuilder()
@@ -501,11 +501,9 @@ class JarvisConversationService : Service() {
         Log.i("JarvisService", "BARGE-IN: Aborting speech, cancelling active tasks, and switching to LISTENING immediately.")
         audioPlayer?.flush()
         speechOutputController?.stopAllSpeech()
-        try { tts?.stop() } catch (_: Exception) {}
         synchronized(voiceOutputLock) {
             isGeminiLiveAudioActive = false
             hasLiveAudioInCurrentTurn = false
-            ttsCallbacks.clear()
         }
 
         cancelAllActiveTools()
@@ -554,8 +552,6 @@ class JarvisConversationService : Service() {
     private var voskSpeechService: SpeechService? = null
     private var speechOutputController: com.jarvis.assistant.audio.ZaraSpeechOutputController? = null
     private val audioFocusController by lazy { com.jarvis.assistant.audio.realtime.AudioFocusController(this) }
-    private var tts: TextToSpeech? = null
-    private val ttsCallbacks = java.util.concurrent.ConcurrentHashMap<String, () -> Unit>()
     private val audioRingBuffer = com.jarvis.assistant.audio.AudioRingBuffer(capacityMs = 3000)
     private var wakeLock: PowerManager.WakeLock? = null
     private var wifiLock: android.net.wifi.WifiManager.WifiLock? = null
@@ -617,62 +613,16 @@ class JarvisConversationService : Service() {
         }
     }
 
-    private fun initTts() {
-        try {
-            tts = TextToSpeech(applicationContext) { status ->
-                if (status == TextToSpeech.SUCCESS) {
-                    com.jarvis.assistant.audio.ZaraVoicePreferenceManager.applyVoiceToTts(this@JarvisConversationService, tts)
-                    tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
-                        override fun onStart(utteranceId: String?) {
-                            Log.d("JarvisService", "TTS onStart: $utteranceId")
-                            com.jarvis.assistant.island.OriginIslandController.startSpeaking(this@JarvisConversationService)
-                        }
-
-                        override fun onDone(utteranceId: String?) {
-                            Log.d("JarvisService", "TTS onDone: $utteranceId")
-                            handleTtsDone(utteranceId)
-                        }
-
-                        @Deprecated("Deprecated in Java")
-                        override fun onError(utteranceId: String?) {
-                            Log.e("JarvisService", "TTS onError: $utteranceId")
-                            handleTtsDone(utteranceId)
-                        }
-
-                        override fun onError(utteranceId: String?, errorCode: Int) {
-                            Log.e("JarvisService", "TTS onError: $utteranceId code: $errorCode")
-                            handleTtsDone(utteranceId)
-                        }
-                    })
-                }
-            }
-        } catch (e: Exception) {
-            Log.e("JarvisService", "Failed to init TTS: ${e.message}")
-        }
-    }
-
-    private fun handleTtsDone(utteranceId: String?) {
-        utteranceId?.let { id ->
-            ttsCallbacks.remove(id)?.invoke()
-        }
-        if (_isSessionOn.value && !_isStandby.value) {
-            com.jarvis.assistant.island.OriginIslandController.startListening(this)
-        } else {
-            com.jarvis.assistant.island.OriginIslandController.dismiss(this)
-        }
-    }
-
     /**
-     * Speaks an immediate voice response using Android TTS with completion callback.
-     * Enforces Single Voice Output: If Gemini Live is playing audio or has already
-     * spoken for this turn, secondary TTS playback is suppressed to eliminate overlapping voices.
+     * Speaks an immediate voice response using native AI audio via Gemini Live.
+     * Legacy Android TextToSpeech is completely purged from Zara.
      */
     fun speakImmediateVoiceResponse(text: String, onDone: (() -> Unit)? = null) {
         if (text.isBlank()) {
             onDone?.invoke()
             return
         }
-        speechOutputController?.speakTts(text, onDone)
+        speechOutputController?.speakNativeAiAudio(text, onDone)
     }
 
     private fun ensureMicrophoneForegroundService() {
@@ -973,9 +923,6 @@ class JarvisConversationService : Service() {
                             synchronized(voiceOutputLock) {
                                 isGeminiLiveAudioActive = true
                                 hasLiveAudioInCurrentTurn = true
-                                // Stop any conflicting Android TTS voice immediately so ONLY Gemini Live voice is heard
-                                try { tts?.stop() } catch (_: Exception) {}
-                                ttsCallbacks.clear()
                             }
                             if (suppressAudioUntilTurnComplete) {
                                 Log.w("JarvisService", "onAudioDataReceived: Audio suppressed (suppressAudioUntilTurnComplete=true)")
@@ -1114,8 +1061,6 @@ class JarvisConversationService : Service() {
                                 isGeminiLiveAudioActive = false
                                 hasLiveAudioInCurrentTurn = false
                                 audioPlayer?.flush()
-                                try { tts?.stop() } catch (_: Exception) {}
-                                ttsCallbacks.clear()
                             }
                             val userTurnInProgress = hasSpeechInCurrentUtterance || currentTurnUserText.isNotBlank()
                             val isOwnAutoResumeInterrupt = autoResumeAwaitingResponse &&
@@ -1140,7 +1085,6 @@ class JarvisConversationService : Service() {
                             thinkingTimeoutJob = null
                             suppressAudioUntilTurnComplete = false
                             audioPlayer?.flush()
-                            try { tts?.stop() } catch (_: Exception) {}
                             currentTurnAssistantText.clear()
                             _liveAssistantResponse.value = ""
                             if (!userTurnInProgress) {
@@ -1349,7 +1293,8 @@ class JarvisConversationService : Service() {
                                                 Log.i("JarvisService", "Auto-resume cancelled because the task/session changed or the user spoke")
                                                 return@launch
                                             }
-                                            val playbackActive = audioPlayer?.isPlaying() == true || tts?.isSpeaking == true ||
+                                            val playbackActive = audioPlayer?.isPlaying() == true ||
+                                                speechOutputController?.isSpeaking() == true ||
                                                 _conversationState.value == ConversationState.SPEAKING
                                             if (playbackActive) {
                                                 quietSince = 0L
@@ -1532,10 +1477,9 @@ class JarvisConversationService : Service() {
                     return@AudioRecorder
                 }
 
-                // Assistant is speaking / AudioTrack or TTS is actively playing:
+                // Assistant is speaking / AudioTrack is actively playing:
                 val isSpeakerActive = (audioPlayer?.isPlaying() == true) ||
                         (speechOutputController?.isSpeaking() == true) ||
-                        (tts?.isSpeaking == true) ||
                         (_conversationState.value == ConversationState.SPEAKING)
 
                 if (isSpeakerActive) {
@@ -3078,7 +3022,7 @@ class JarvisConversationService : Service() {
 
         if (cleanSpeech.lowercase(Locale.ROOT).matches(Regex(".*\\b(stop|wait|cancel|abort|don't open|dont open|cancel that|cancel task|cancel automation|atha pannatha|illa|mat karo|mat kholo|bas karo|ruk jao|ruko|stop speaking)\\b.*"))) {
             audioPlayer?.flush()
-            try { tts?.stop() } catch (_: Exception) {}
+            speechOutputController?.stopAllSpeech()
             cancelAllActiveTools()
             com.jarvis.assistant.automation.agent.AgentTaskEngine.requestCancellation()
             com.jarvis.assistant.automation.agent.SerializedActionExecutor.cancelAllPendingActions()
@@ -3968,11 +3912,7 @@ class JarvisConversationService : Service() {
         speechOutputController?.release()
         speechOutputController = null
         com.jarvis.assistant.notification.ZaraNotificationManager.stopForegroundService(this)
-        try {
-            tts?.stop()
-            tts?.shutdown()
-        } catch (_: Exception) {}
-        tts = null
+
         try {
             voskSpeechService?.stop()
         } catch (_: Exception) {}

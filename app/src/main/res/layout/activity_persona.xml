@@ -518,6 +518,65 @@
                 android:textStyle="bold"
                 android:layout_marginBottom="8dp" />
 
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/cardOpenVoiceStudio"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="12dp"
+                app:cardCornerRadius="14dp"
+                app:cardElevation="0dp"
+                app:strokeWidth="1dp"
+                app:strokeColor="@color/studio_purple_accent"
+                app:cardBackgroundColor="@color/studio_card_bg"
+                android:clickable="true"
+                android:focusable="true">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:padding="14dp">
+
+                    <ImageView
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:src="@drawable/ic_voice_waveform"
+                        app:tint="@color/studio_purple_bright" />
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical"
+                        android:layout_marginStart="12dp">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Zara Voice Studio"
+                            android:textColor="@color/studio_text_primary"
+                            android:textSize="14sp"
+                            android:fontFamily="sans-serif-medium"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Explore 10 Natural Tamil AI Voices (ta-IN)"
+                            android:textColor="@color/studio_purple_bright"
+                            android:textSize="11sp"
+                            android:fontFamily="sans-serif" />
+                    </LinearLayout>
+
+                    <ImageView
+                        android:layout_width="18dp"
+                        android:layout_height="18dp"
+                        android:src="@drawable/ic_arrow_right"
+                        app:tint="@color/studio_purple_bright" />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
             <RadioGroup
                 android:id="@+id/rgVoiceGroup"
                 android:layout_width="match_parent"

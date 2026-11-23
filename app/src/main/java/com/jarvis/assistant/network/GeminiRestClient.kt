@@ -113,4 +113,96 @@ object GeminiRestClient {
             Result.failure(e)
         }
     }
+
+    /**
+     * Synthesizes speech using Gemini's native neural audio generation.
+     * Returns decoded raw audio bytes (PCM/WAV).
+     */
+    suspend fun synthesizeSpeech(
+        apiKey: String,
+        voiceName: String,
+        text: String,
+        model: String = "gemini-2.5-flash"
+    ): Result<ByteArray> = withContext(Dispatchers.IO) {
+        if (apiKey.isBlank()) {
+            return@withContext Result.failure(IllegalArgumentException("Gemini API key is missing"))
+        }
+        if (text.isBlank()) {
+            return@withContext Result.failure(IllegalArgumentException("Text is blank"))
+        }
+
+        try {
+            val cleanModel = if (model.startsWith("models/")) model.removePrefix("models/") else model
+            val targetModel = when (cleanModel) {
+                "gemini-3.8-live", "gemini-3.1-flash-live-preview" -> "gemini-2.5-flash"
+                else -> cleanModel.ifBlank { "gemini-2.5-flash" }
+            }
+            val url = "$BASE_URL/$targetModel:generateContent?key=$apiKey"
+
+            val jsonBody = JSONObject().apply {
+                val contentsArray = JSONArray().apply {
+                    put(JSONObject().apply {
+                        put("role", "user")
+                        put("parts", JSONArray().apply {
+                            put(JSONObject().apply {
+                                put("text", "Read this text aloud with warm human emotion, accurate pronunciation, and natural conversational cadence. Output only audio:\n$text")
+                            })
+                        })
+                    })
+                }
+                put("contents", contentsArray)
+
+                put("generationConfig", JSONObject().apply {
+                    put("responseModalities", JSONArray().put("AUDIO"))
+                    put("speechConfig", JSONObject().apply {
+                        put("voiceConfig", JSONObject().apply {
+                            put("prebuiltVoiceConfig", JSONObject().apply {
+                                put("voiceName", voiceName)
+                            })
+                        })
+                    })
+                    put("temperature", 0.6)
+                })
+            }
+
+            val mediaType = "application/json; charset=utf-8".toMediaType()
+            val requestBody = jsonBody.toString().toRequestBody(mediaType)
+            val request = Request.Builder()
+                .url(url)
+                .post(requestBody)
+                .build()
+
+            val response = httpClient.newCall(request).execute()
+            response.use { resp ->
+                val body = resp.body?.string().orEmpty()
+                if (!resp.isSuccessful) {
+                    Log.e(TAG, "synthesizeSpeech HTTP error ${resp.code}: $body")
+                    return@withContext Result.failure(IOException("HTTP ${resp.code}: $body"))
+                }
+
+                val jsonResponse = JSONObject(body)
+                val candidates = jsonResponse.optJSONArray("candidates")
+                if (candidates != null && candidates.length() > 0) {
+                    val parts = candidates.getJSONObject(0).optJSONObject("content")?.optJSONArray("parts")
+                    if (parts != null) {
+                        for (i in 0 until parts.length()) {
+                            val part = parts.getJSONObject(i)
+                            val inlineData = part.optJSONObject("inlineData")
+                            if (inlineData != null) {
+                                val base64Data = inlineData.optString("data")
+                                if (base64Data.isNotBlank()) {
+                                    val decoded = android.util.Base64.decode(base64Data, android.util.Base64.DEFAULT)
+                                    return@withContext Result.success(decoded)
+                                }
+                            }
+                        }
+                    }
+                }
+                Result.failure(IOException("No audio content in Gemini response"))
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "synthesizeSpeech exception: ${e.message}", e)
+            Result.failure(e)
+        }
+    }
 }

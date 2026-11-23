@@ -104,6 +104,7 @@ class SettingsFragment : Fragment() {
         val currentVoice = preferences.voice
         binding.tvCurrentPersona.text = "$currentPersona • Voice: $currentVoice"
         binding.tvProfilePersonaChip.text = currentPersona.uppercase()
+        binding.tvVoiceStudioSubtitle.text = "Active Voice: $currentVoice • Strict Lock Active"
 
         // Silent Execution Mode
         binding.switchSilentMode.isChecked = preferences.isSilentExecutionMode
@@ -154,6 +155,10 @@ class SettingsFragment : Fragment() {
 
         binding.rowPersonaVoice.setOnClickListener {
             startActivity(Intent(requireContext(), PersonaActivity::class.java))
+        }
+
+        binding.rowVoiceStudio.setOnClickListener {
+            startActivity(Intent(requireContext(), com.jarvis.assistant.ui.voice.VoiceStudioActivity::class.java))
         }
 
         binding.switchSilentMode.setOnCheckedChangeListener { _, isChecked ->

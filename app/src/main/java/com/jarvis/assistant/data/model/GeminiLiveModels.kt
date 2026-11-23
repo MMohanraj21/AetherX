@@ -39,18 +39,25 @@ object GeminiConstants {
         "Urdu"
     )
 
-    const val DEFAULT_VOICE = "Aoede"
+    const val DEFAULT_VOICE = "Sulafat"
 
-    val SUPPORTED_VOICES = listOf(
+    val FEMALE_VOICES = listOf(
+        "Sulafat",
+        "Achernar",
         "Aoede",
-        "Charon",
-        "Kore",
-        "Fenrir",
-        "Puck",
-        "Leda",
-        "Orus",
+        "Vindemiatrix",
         "Zephyr"
     )
+
+    val MALE_VOICES = listOf(
+        "Algieba",
+        "Achird",
+        "Charon",
+        "Umbriel",
+        "Puck"
+    )
+
+    val SUPPORTED_VOICES = FEMALE_VOICES + MALE_VOICES
 
     const val PERSONALITY_ASSISTANT = "Zara Pro"
     const val PERSONALITY_GIRLFRIEND = "Girlfriend Mode"
