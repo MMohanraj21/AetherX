@@ -1,13 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.constraintlayout.widget.ConstraintLayout
+<androidx.drawerlayout.widget.DrawerLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    android:id="@+id/rootMainLayout"
+    android:id="@+id/drawerLayoutMain"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:clipChildren="false"
-    android:clipToPadding="false"
-    android:background="?attr/themeBg">
+    android:layout_height="match_parent">
+
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:id="@+id/rootMainLayout"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:clipChildren="false"
+        android:clipToPadding="false"
+        android:background="?attr/themeBg">
 
     <!-- Fragment Container for Home, Chat, Settings, and Updates -->
     <FrameLayout
@@ -279,3 +284,10 @@
         android:layout_marginTop="-21dp" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>
+
+    <!-- Sidebar Navigation Drawer -->
+    <include
+        android:id="@+id/sidebarDrawer"
+        layout="@layout/layout_sidebar_drawer" />
+
+</androidx.drawerlayout.widget.DrawerLayout>

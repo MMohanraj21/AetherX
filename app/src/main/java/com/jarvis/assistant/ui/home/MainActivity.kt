@@ -198,12 +198,15 @@ class MainActivity : AppCompatActivity() {
         trans.commitNow()
 
         setupNavigationDock()
+        setupSidebar()
         selectTab(currentTab)
         observeViewModel()
         handleAssistIntent(intent)
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
-                if (currentTab != TAB_HOME) {
+                if (binding.drawerLayoutMain.isDrawerOpen(androidx.core.view.GravityCompat.START)) {
+                    closeSidebar()
+                } else if (currentTab != TAB_HOME) {
                     selectTab(TAB_HOME)
                 } else {
                     // Preserve Android's normal root behavior (return to launcher) only
@@ -214,6 +217,40 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         })
+    }
+
+    fun launchVoiceMode() {
+        startActivity(Intent(this, com.jarvis.assistant.ui.voice.VoiceModeActivity::class.java))
+    }
+
+    fun openSidebar() {
+        binding.drawerLayoutMain.openDrawer(androidx.core.view.GravityCompat.START)
+    }
+
+    fun closeSidebar() {
+        binding.drawerLayoutMain.closeDrawer(androidx.core.view.GravityCompat.START)
+    }
+
+    private fun setupSidebar() {
+        binding.sidebarDrawer.btnSidebarNewChat.setOnClickListener {
+            selectTab(TAB_CHAT)
+            closeSidebar()
+        }
+        binding.sidebarDrawer.layoutNavMemories.setOnClickListener {
+            startActivity(Intent(this, com.jarvis.assistant.ui.memory.MemoryActivity::class.java))
+            closeSidebar()
+        }
+        binding.sidebarDrawer.layoutNavExploreTools.setOnClickListener {
+            startActivity(Intent(this, ExploreToolsActivity::class.java))
+            closeSidebar()
+        }
+        binding.sidebarDrawer.layoutNavSettings.setOnClickListener {
+            selectTab(TAB_SETTINGS)
+            closeSidebar()
+        }
+        binding.sidebarDrawer.layoutSidebarUserProfile.setOnClickListener {
+            Toast.makeText(this, "ZARA AI — Founder & Lead Architect: Mohanraj (@Hexvora777)", Toast.LENGTH_LONG).show()
+        }
     }
 
     private fun handleAssistIntent(intent: Intent?) {

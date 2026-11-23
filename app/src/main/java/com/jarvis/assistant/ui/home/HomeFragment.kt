@@ -72,9 +72,9 @@ class HomeFragment : Fragment() {
         com.jarvis.assistant.util.ThemeManager.applyDynamicBackground(binding.root)
         createTaskFallbackPanel()
 
-        // Top Navigation
+        // Top Navigation - Open Sidebar Drawer
         binding.btnTopChat.setOnClickListener {
-            (activity as? MainActivity)?.selectTab(MainActivity.TAB_CHAT)
+            (activity as? MainActivity)?.openSidebar()
         }
 
         binding.btnTopSettings.setOnClickListener {

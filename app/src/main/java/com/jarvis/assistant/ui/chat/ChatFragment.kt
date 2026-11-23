@@ -68,9 +68,9 @@ class ChatFragment : Fragment() {
                 .show()
         }
 
-        // Back / Menu
+        // Open Sidebar Menu
         binding.btnChatMenu.setOnClickListener {
-            (activity as? MainActivity)?.selectTab(MainActivity.TAB_HOME)
+            (activity as? MainActivity)?.openSidebar()
         }
 
         // Mode Chips

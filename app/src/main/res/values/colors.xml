@@ -63,4 +63,20 @@
     <color name="naira_avatar_bg">#EFF6FF</color>
     <color name="naira_input_bg">#FFFFFF</color>
     <color name="naira_chip_bg">#F1F5F9</color>
+
+    <!-- ZARA AI v5.4.0 — ChatGPT + Gemini Hybrid Theme Tokens -->
+    <color name="zara_bg_oled">#090A0F</color>
+    <color name="zara_surface_charcoal">#12131A</color>
+    <color name="zara_card_elevated">#181924</color>
+    <color name="zara_card_border">#232636</color>
+    <color name="zara_accent_purple">#A855F7</color>
+    <color name="zara_accent_purple_bright">#C084FC</color>
+    <color name="zara_accent_indigo">#6366F1</color>
+    <color name="zara_gemini_blue">#38BDF8</color>
+    <color name="zara_text_primary">#F8FAFC</color>
+    <color name="zara_text_secondary">#94A3B8</color>
+    <color name="zara_text_muted">#64748B</color>
+    <color name="zara_status_success">#10B981</color>
+    <color name="zara_status_warning">#F59E0B</color>
+    <color name="zara_status_error">#EF4444</color>
 </resources>

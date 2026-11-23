@@ -245,4 +245,15 @@
     <style name="Theme.JarvisAssistant.CyberpunkNeon" parent="Theme.JarvisAssistant.Dark" />
     <style name="Theme.JarvisAssistant.EmeraldObsidian" parent="Theme.JarvisAssistant.Dark" />
     <style name="Theme.JarvisAssistant.RoseGold" parent="Theme.JarvisAssistant.Sunset" />
+
+    <!-- ZARA AI v5.4.0 — Redesigned Components -->
+    <style name="Widget.Zara.ActionChip" parent="Widget.Material3.Chip.Assist">
+        <item name="chipBackgroundColor">@color/zara_card_elevated</item>
+        <item name="chipStrokeColor">@color/zara_card_border</item>
+        <item name="chipStrokeWidth">1dp</item>
+        <item name="chipCornerRadius">16dp</item>
+        <item name="android:textColor">@color/zara_text_primary</item>
+        <item name="android:textSize">13sp</item>
+        <item name="android:fontFamily">sans-serif-medium</item>
+    </style>
 </resources>

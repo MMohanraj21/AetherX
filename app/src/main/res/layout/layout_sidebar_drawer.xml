@@ -1,0 +1,356 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="300dp"
+    android:layout_height="match_parent"
+    android:layout_gravity="start"
+    android:orientation="vertical"
+    android:background="@color/zara_surface_charcoal"
+    android:paddingStart="16dp"
+    android:paddingEnd="16dp"
+    android:paddingTop="36dp"
+    android:paddingBottom="24dp">
+
+    <!-- Top Header: Logo + New Chat -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:layout_marginBottom="16dp">
+
+        <ImageView
+            android:layout_width="28dp"
+            android:layout_height="28dp"
+            android:src="@drawable/ic_sparkle"
+            app:tint="@color/zara_accent_purple" />
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="8dp"
+            android:text="ZARA AI"
+            android:textColor="@color/zara_text_primary"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:fontFamily="sans-serif-medium" />
+
+        <!-- New Chat Action Pill -->
+        <LinearLayout
+            android:id="@+id/btnSidebarNewChat"
+            android:layout_width="wrap_content"
+            android:layout_height="32dp"
+            android:orientation="horizontal"
+            android:gravity="center"
+            android:background="@drawable/bg_zara_pill_chip"
+            android:paddingStart="10dp"
+            android:paddingEnd="10dp"
+            android:clickable="true"
+            android:focusable="true">
+
+            <ImageView
+                android:layout_width="14dp"
+                android:layout_height="14dp"
+                android:src="@drawable/ic_plus"
+                app:tint="@color/zara_accent_purple"
+                android:layout_marginEnd="4dp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="New"
+                android:textColor="@color/zara_text_primary"
+                android:textSize="12sp"
+                android:fontFamily="sans-serif-medium" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- Search Conversations -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="38dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:background="@drawable/bg_zara_composer_dock"
+        android:paddingStart="10dp"
+        android:paddingEnd="10dp"
+        android:layout_marginBottom="16dp">
+
+        <ImageView
+            android:layout_width="16dp"
+            android:layout_height="16dp"
+            android:src="@drawable/ic_chat_bubble"
+            app:tint="@color/zara_text_muted"
+            android:layout_marginEnd="8dp" />
+
+        <EditText
+            android:id="@+id/etSidebarSearch"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="@android:color/transparent"
+            android:hint="Search chats..."
+            android:textColorHint="@color/zara_text_muted"
+            android:textColor="@color/zara_text_primary"
+            android:textSize="13sp"
+            android:inputType="text" />
+    </LinearLayout>
+
+    <!-- Scrollable Chat History & Core Shortcuts -->
+    <androidx.core.widget.NestedScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:fillViewport="true">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <!-- Pinned Section -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="PINNED"
+                android:textColor="@color/zara_text_muted"
+                android:textSize="11sp"
+                android:textStyle="bold"
+                android:letterSpacing="0.08"
+                android:layout_marginBottom="6dp" />
+
+            <LinearLayout
+                android:id="@+id/itemPinnedChat1"
+                android:layout_width="match_parent"
+                android:layout_height="36dp"
+                android:gravity="center_vertical"
+                android:paddingStart="6dp"
+                android:paddingEnd="6dp"
+                android:background="@drawable/bg_zara_icon_ripple">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="📌 AetherX System Architecture"
+                    android:textColor="@color/zara_text_primary"
+                    android:textSize="13sp"
+                    android:maxLines="1"
+                    android:ellipsize="end" />
+            </LinearLayout>
+
+            <!-- Recent Section -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="RECENT"
+                android:textColor="@color/zara_text_muted"
+                android:textSize="11sp"
+                android:textStyle="bold"
+                android:letterSpacing="0.08"
+                android:layout_marginTop="16dp"
+                android:layout_marginBottom="6dp" />
+
+            <LinearLayout
+                android:id="@+id/itemRecentChat1"
+                android:layout_width="match_parent"
+                android:layout_height="36dp"
+                android:gravity="center_vertical"
+                android:paddingStart="6dp"
+                android:paddingEnd="6dp"
+                android:background="@drawable/bg_zara_icon_ripple">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="💬 Tamil Voice Translation Setup"
+                    android:textColor="@color/zara_text_secondary"
+                    android:textSize="13sp"
+                    android:maxLines="1"
+                    android:ellipsize="end" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/itemRecentChat2"
+                android:layout_width="match_parent"
+                android:layout_height="36dp"
+                android:gravity="center_vertical"
+                android:paddingStart="6dp"
+                android:paddingEnd="6dp"
+                android:background="@drawable/bg_zara_icon_ripple">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="💬 Daily Briefing &amp; Weather"
+                    android:textColor="@color/zara_text_secondary"
+                    android:textSize="13sp"
+                    android:maxLines="1"
+                    android:ellipsize="end" />
+            </LinearLayout>
+
+            <!-- Divider -->
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="@color/zara_card_border"
+                android:layout_marginTop="16dp"
+                android:layout_marginBottom="16dp" />
+
+            <!-- Core AI Shortcuts -->
+            <LinearLayout
+                android:id="@+id/layoutNavMemories"
+                android:layout_width="match_parent"
+                android:layout_height="40dp"
+                android:gravity="center_vertical"
+                android:paddingStart="8dp"
+                android:paddingEnd="8dp"
+                android:background="@drawable/bg_zara_icon_ripple">
+
+                <ImageView
+                    android:layout_width="18dp"
+                    android:layout_height="18dp"
+                    android:src="@drawable/ic_stack_memory"
+                    app:tint="@color/zara_accent_purple"
+                    android:layout_marginEnd="10dp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Semantic Memories v4"
+                    android:textColor="@color/zara_text_primary"
+                    android:textSize="14sp" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/layoutNavExploreTools"
+                android:layout_width="match_parent"
+                android:layout_height="40dp"
+                android:gravity="center_vertical"
+                android:paddingStart="8dp"
+                android:paddingEnd="8dp"
+                android:background="@drawable/bg_zara_icon_ripple">
+
+                <ImageView
+                    android:layout_width="18dp"
+                    android:layout_height="18dp"
+                    android:src="@drawable/ic_bolt"
+                    app:tint="@color/zara_accent_purple"
+                    android:layout_marginEnd="10dp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Explore AI Tools (32)"
+                    android:textColor="@color/zara_text_primary"
+                    android:textSize="14sp" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/layoutNavAutomations"
+                android:layout_width="match_parent"
+                android:layout_height="40dp"
+                android:gravity="center_vertical"
+                android:paddingStart="8dp"
+                android:paddingEnd="8dp"
+                android:background="@drawable/bg_zara_icon_ripple">
+
+                <ImageView
+                    android:layout_width="18dp"
+                    android:layout_height="18dp"
+                    android:src="@drawable/ic_checklist_tasks"
+                    app:tint="@color/zara_accent_purple"
+                    android:layout_marginEnd="10dp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Automations &amp; Routines"
+                    android:textColor="@color/zara_text_primary"
+                    android:textSize="14sp" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/layoutNavSettings"
+                android:layout_width="match_parent"
+                android:layout_height="40dp"
+                android:gravity="center_vertical"
+                android:paddingStart="8dp"
+                android:paddingEnd="8dp"
+                android:background="@drawable/bg_zara_icon_ripple">
+
+                <ImageView
+                    android:layout_width="18dp"
+                    android:layout_height="18dp"
+                    android:src="@drawable/ic_nav_settings"
+                    app:tint="@color/zara_accent_purple"
+                    android:layout_marginEnd="10dp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Settings"
+                    android:textColor="@color/zara_text_primary"
+                    android:textSize="14sp" />
+            </LinearLayout>
+
+        </LinearLayout>
+    </androidx.core.widget.NestedScrollView>
+
+    <!-- User Profile Footer (Mohanraj • Founder) -->
+    <LinearLayout
+        android:id="@+id/layoutSidebarUserProfile"
+        android:layout_width="match_parent"
+        android:layout_height="52dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:background="@drawable/bg_zara_composer_dock"
+        android:paddingStart="12dp"
+        android:paddingEnd="12dp"
+        android:layout_marginTop="12dp">
+
+        <FrameLayout
+            android:layout_width="32dp"
+            android:layout_height="32dp">
+
+            <ImageView
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:src="@drawable/ic_user_profile"
+                app:tint="@color/zara_accent_purple" />
+
+            <ImageView
+                android:layout_width="12dp"
+                android:layout_height="12dp"
+                android:layout_gravity="bottom|end"
+                android:src="@drawable/ic_verified_badge"
+                app:tint="@color/zara_gemini_blue" />
+        </FrameLayout>
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:layout_marginStart="10dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Mohanraj"
+                android:textColor="@color/zara_text_primary"
+                android:textSize="13sp"
+                android:textStyle="bold"
+                android:fontFamily="sans-serif-medium" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Founder &amp; Architect"
+                android:textColor="@color/zara_accent_purple"
+                android:textSize="10sp"
+                android:fontFamily="sans-serif" />
+        </LinearLayout>
+    </LinearLayout>
+
+</LinearLayout>
