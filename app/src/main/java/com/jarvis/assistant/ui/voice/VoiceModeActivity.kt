@@ -91,7 +91,7 @@ class VoiceModeActivity : AppCompatActivity() {
                                 binding.viewStateDot.setBackgroundResource(R.drawable.bg_zara_badge_success)
                                 binding.viewAmbientHalo.animate().scaleX(1.15f).scaleY(1.15f).setDuration(400).start()
                             }
-                            ConversationState.THINKING, ConversationState.PROCESSING -> {
+                            ConversationState.THINKING -> {
                                 binding.tvVoiceStateIndicator.text = "THINKING..."
                                 binding.tvVoiceStateIndicator.setTextColor(getColor(R.color.zara_status_warning))
                                 binding.viewStateDot.setBackgroundColor(getColor(R.color.zara_status_warning))
