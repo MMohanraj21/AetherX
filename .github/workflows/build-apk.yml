@@ -97,34 +97,32 @@ jobs:
         if: github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v5.3.0
-          name: "Zara AI Assistant v5.3.0 — Double Voice Fix & Intelligent Single Confirmation System"
+          tag_name: v5.4.0
+          name: "Zara AI Assistant v5.4.0 — Complete UI/UX Redesign (ChatGPT + Gemini Hybrid)"
           body: |
-            ### Zara AI Assistant v5.3.0 (Release Build 530)
+            ### Zara AI Assistant v5.4.0 (Release Build 540)
             Architected, Designed & Developed exclusively by Mohanraj (@Hexvora777).
             Official Connections:
             - Telegram: https://t.me/Hexvora777
             - Instagram: https://instagram.com/Hexvora777
             - Motto: "Every identity has an origin. Mine is Mohanraj."
 
-            ### What's New in v5.3.0:
-            - **Single Voice Output Architecture (Double Voice Completely Fixed)**:
-              - Full audit of all audio output engines (Gemini Live Audio vs Android TextToSpeech).
-              - Authoritative Speech Arbiter (`voiceOutputLock`): When Gemini Live streams generated audio, secondary Android TTS reading of the transcript is suppressed.
-              - When Gemini returns text only (REST fallback `GeminiRestClient`), the configured Zara TTS speaks authoritatively without late streaming audio collision.
-              - Immediate barge-in & interruption: Flushes both AudioTrack and TTS instantly when user speaks.
-              - Preserves existing Zara voice identity, pitch, and timbre.
-            - **Intelligent Single Confirmation System**:
-              - Eliminates repeated confirmation questions ("Send pannava?", "Send pannattuma?", "Should I send it?", "Are you sure?").
-              - Unified `IntelligentConfirmationManager` with Risk-Based Confirmation Policy:
-                - **Category A (No Confirmation Needed)**: Open Instagram, Open ChatGPT, Open YouTube, Tell time, Check battery, Music controls execute immediately in < 50ms.
-                - **Category B (Single Confirmation)**: WhatsApp messages, Notification replies, SMS ask EXACTLY ONCE ("Rahul-kku WhatsApp message send pannava?"). User says "Yes" -> executes once immediately ("Message sent successfully."). User says "No" -> cancels immediately ("Okay, message cancelled.").
-                - **Category C (Strong Confirmation)**: Sensitive and destructive actions safeguarded with explicit authorization.
-            - **Duplicate Execution Protection**:
-              - Unique request IDs, action IDs, single-use authentication tokens.
-              - Idempotency filter with 30s TTL prevents duplicate messages from duplicate tool callbacks or retries.
-            - **Acceptance Test Suite**:
-              - Verified with automated acceptance tests covering all 10 voice and confirmation scenarios.
+            ### What's New in v5.4.0:
+            - **ChatGPT + Gemini Hybrid UI/UX Architecture**:
+              - Pure OLED Dark Theme (`#090A0F`, `#12131A`, `#181924`) with Electric Purple brand accents (`#A855F7`) and Gemini Sapphire reflections (`#38BDF8`).
+              - Minimalist Home Canvas with personalized greeting, suggestion prompt chips (*Analyze Screen*, *Play Music*, *Send WhatsApp*, *Daily Briefing*, *Device Control*).
+              - Sleek floating composer dock with multiline input, attachment picker, camera vision trigger, and dedicated Live Voice Mode button.
+            - **Sidebar Navigation Drawer**:
+              - New Chat, Search chats, Pinned & Recent conversations, Semantic Memories v4 shortcut, Explore AI Tools shortcut, Automations, Settings, and Mohanraj Verified Founder profile footer.
+            - **Dedicated Immersive Voice Mode (`VoiceModeActivity`)**:
+              - Fluid audio-reactive living waveform and continuous conversation state machine.
+              - Live subtitles/transcript card, mic mute toggle, interrupt button, and strict voice lock display (`Aoede (F)` / `Puck (M)`).
+              - Continuous session runs non-disruptively in background foreground service without termination on navigation.
+            - **Explore AI Tools Catalog (32 Actions)**:
+              - Full directory organizing all 32 backend actions across 12 intuitive categories with "Try This" prompt pills.
+            - **Vivo Origin Island & Hardware Guarantees**:
+              - Native punch-hole integration on Vivo T5 Pro / OriginOS 6 (`NOTIFICATION_ID = 41`).
+              - 100% preservation of all 32 tools, Gemini Live WebSocket, and single voice arbiter.
           files: |
             artifacts/Zara-release.apk
             artifacts/Zara-debug.apk

@@ -83,7 +83,7 @@
                 android:id="@+id/tvToolExamplePrompt"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="\"Open YouTube\""
+                android:text="Open YouTube"
                 android:textColor="@color/zara_accent_purple"
                 android:textSize="11sp"
                 android:textStyle="bold" />
