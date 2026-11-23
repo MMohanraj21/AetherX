@@ -444,10 +444,28 @@ class JarvisConversationService : Service() {
         return overlap >= 0.62f
     }
 
-    private fun setConversationState(state: ConversationState) {
-        if (_conversationState.value != state) {
-            _conversationState.value = state
-            updateNotification()
+    private fun setConversationState(state: ConversationState, reason: String = "direct") {
+        val sm = stateMachine
+        if (sm != null) {
+            when (state) {
+                ConversationState.IDLE -> sm.endSession(reason)
+                ConversationState.LISTENING -> {
+                    if (sm.state.value == ConversationState.SPEAKING) {
+                        sm.onPlaybackFinish(sm.currentTurnId, reason, continueListening = true)
+                    } else if (sm.state.value == ConversationState.IDLE) {
+                        sm.startSession(reason)
+                    } else {
+                        sm.onUserSpeechStart(reason)
+                    }
+                }
+                ConversationState.THINKING -> sm.onProcessingStart(sm.currentTurnId, reason)
+                ConversationState.SPEAKING -> sm.onPlaybackStart(sm.currentTurnId, reason)
+            }
+        } else {
+            if (_conversationState.value != state) {
+                _conversationState.value = state
+                updateNotification()
+            }
         }
     }
 
@@ -482,6 +500,7 @@ class JarvisConversationService : Service() {
     private fun handleBargeInInterruption(initialChunk: ByteArray? = null, timestamp: Long = System.currentTimeMillis()) {
         Log.i("JarvisService", "BARGE-IN: Aborting speech, cancelling active tasks, and switching to LISTENING immediately.")
         audioPlayer?.flush()
+        speechOutputController?.stopAllSpeech()
         try { tts?.stop() } catch (_: Exception) {}
         synchronized(voiceOutputLock) {
             isGeminiLiveAudioActive = false
@@ -497,7 +516,8 @@ class JarvisConversationService : Service() {
             liveWebSocket?.abortTurn()
         } catch (_: Exception) {}
 
-        setConversationState(ConversationState.LISTENING)
+        stateMachine?.onBargeInConfirmed(stateMachine?.currentTurnId ?: 0L, "handleBargeInInterruption")
+        setConversationState(ConversationState.LISTENING, "bargeIn")
         lastUserSpeechDetectedTime = timestamp
         hasSpeechInCurrentUtterance = true
         hasSignalledUtteranceEnd = false
@@ -530,6 +550,7 @@ class JarvisConversationService : Service() {
     }
 
     // --- Standby / wake-word components (Pure Vosk) ---
+    private var stateMachine: com.jarvis.assistant.conversation.ZaraConversationStateMachine? = null
     private var voskSpeechService: SpeechService? = null
     private var speechOutputController: com.jarvis.assistant.audio.ZaraSpeechOutputController? = null
     private val audioFocusController by lazy { com.jarvis.assistant.audio.realtime.AudioFocusController(this) }
@@ -548,8 +569,11 @@ class JarvisConversationService : Service() {
     override fun onCreate() {
         super.onCreate()
         activeInstance = this
+        stateMachine = com.jarvis.assistant.conversation.ZaraConversationStateMachine(this) { newState ->
+            _conversationState.value = newState
+        }
         speechOutputController = com.jarvis.assistant.audio.ZaraSpeechOutputController(this) { state ->
-            setConversationState(state)
+            setConversationState(state, "speechOutputController")
         }
         ensureMicrophoneForegroundService()
         headsetAudioRouter = com.jarvis.assistant.audio.HeadsetAudioRouter(applicationContext)
@@ -835,7 +859,8 @@ class JarvisConversationService : Service() {
         audioFocusController.requestFocus(exclusive = false)
         com.jarvis.assistant.conversation.ContinuousConversationManager.startSession()
         startInactivityTimer()
-        setConversationState(ConversationState.LISTENING)
+        stateMachine?.startSession("beginActiveConversation")
+        setConversationState(ConversationState.LISTENING, "beginActiveConversation")
         updateNotification()
         headsetAudioRouter?.start()
 
@@ -849,7 +874,8 @@ class JarvisConversationService : Service() {
                     speechOutputController?.onGeminiAudioStarted()
                     com.jarvis.assistant.conversation.ContinuousConversationManager.onSpeaking()
                     com.jarvis.assistant.audio.WakeWordManager.transitionTo(com.jarvis.assistant.audio.VoiceCycleState.SPEAKING, "Audio playback started")
-                    setConversationState(ConversationState.SPEAKING)
+                    stateMachine?.onPlaybackStart(stateMachine?.currentTurnId ?: 0L, "AudioPlayer")
+                    setConversationState(ConversationState.SPEAKING, "AudioPlayer.isPlaying=true")
                 } else {
                     synchronized(voiceOutputLock) {
                         isGeminiLiveAudioActive = false
@@ -863,8 +889,12 @@ class JarvisConversationService : Service() {
                         // UNLIMITED CONTINUOUS CONVERSATION:
                         // Maintain LISTENING mode indefinitely. The microphone remains active for uninterrupted conversation
                         // until the user explicitly issues a verbal STOP command or manually ends the session.
-                        setConversationState(ConversationState.LISTENING)
+                        stateMachine?.onPlaybackFinish(stateMachine?.currentTurnId ?: 0L, "AudioPlayer", continueListening = true)
+                        setConversationState(ConversationState.LISTENING, "AudioPlayer.isPlaying=false")
                         Log.d("JarvisService", "Speech playback complete. Continuous conversation listening for user's next utterance.")
+                    } else {
+                        stateMachine?.onPlaybackFinish(stateMachine?.currentTurnId ?: 0L, "AudioPlayer", continueListening = false)
+                        setConversationState(ConversationState.IDLE, "AudioPlayer.sessionEnded")
                     }
                 }
             },
@@ -973,7 +1003,8 @@ class JarvisConversationService : Service() {
                             if (audioChunksReceivedInTurn % 25 == 1) {
                                 Log.d("JarvisService", "Streaming audio chunk #$audioChunksReceivedInTurn (${pcmData.size} bytes) to AudioPlayer")
                             }
-                            setConversationState(ConversationState.SPEAKING)
+                            stateMachine?.onPlaybackChunk(stateMachine?.currentTurnId ?: 0L, "onAudioDataReceived")
+                            setConversationState(ConversationState.SPEAKING, "onAudioDataReceived")
                             audioPlayer?.enqueueAudio(pcmData)
                         }
 
@@ -1494,15 +1525,17 @@ class JarvisConversationService : Service() {
                 }
 
                 // Acoustic Echo Decay Protection (AEDP):
-                // For 150ms after speaker audio stops, discard mic chunks so room reverberation
+                // For 250ms after speaker audio stops, discard mic chunks so room reverberation
                 // does not bounce into Gemini Live and cause false self-interruption.
-                if (now - lastPlaybackEndTime < 150L) {
+                if (now - lastPlaybackEndTime < 250L) {
                     consecutiveVoicedFrames = 0
                     return@AudioRecorder
                 }
 
                 // Assistant is speaking / AudioTrack or TTS is actively playing:
-                val isSpeakerActive = (audioPlayer?.isPlaying() == true) || (tts?.isSpeaking == true) ||
+                val isSpeakerActive = (audioPlayer?.isPlaying() == true) ||
+                        (speechOutputController?.isSpeaking() == true) ||
+                        (tts?.isSpeaking == true) ||
                         (_conversationState.value == ConversationState.SPEAKING)
 
                 if (isSpeakerActive) {
@@ -1511,12 +1544,14 @@ class JarvisConversationService : Service() {
                     // AudioRecord uses VOICE_COMMUNICATION with AcousticEchoCanceler enabled,
                     // which cancels out speaker output. When the user speaks, their near-field voice
                     // raises mic amplitude above the cancellation floor.
-                    val bargeInThreshold = if (hasHeadset) 0.20f else 0.28f
+                    // Loudspeaker threshold raised to 0.45f and 10 frames (200ms) to prevent loudspeaker self-interruption.
+                    val bargeInThreshold = if (hasHeadset) 0.20f else 0.45f
                     val isHumanBargeIn = com.jarvis.assistant.audio.AudioUtils.isHumanVoice(frequencyData)
 
                     if (amplitude > bargeInThreshold && isHumanBargeIn) {
                         consecutiveVoicedFrames++
-                        if (consecutiveVoicedFrames >= 3) {
+                        val requiredFrames = if (hasHeadset) 5 else 10
+                        if (consecutiveVoicedFrames >= requiredFrames) {
                             Log.i("JarvisService", "Voice barge-in triggered! User interrupted speech (amp=$amplitude, hasHeadset=$hasHeadset)")
                             handleBargeInInterruption(chunk, now)
                             return@AudioRecorder
@@ -1571,6 +1606,7 @@ class JarvisConversationService : Service() {
                     // Declare speech start only after several consecutive voiced frames (not a short noise blip)
                     if (consecutiveVoicedFrames >= VAD_START_FRAMES) {
                         if (!hasSpeechInCurrentUtterance) {
+                            stateMachine?.onUserSpeechStart("VAD_START")
                             utteranceStartTime = now
                             currentTurnUserText.clear()
                             currentTurnAssistantText.clear()
@@ -1757,7 +1793,8 @@ class JarvisConversationService : Service() {
                                             com.jarvis.assistant.island.OriginIslandController.updateVoiceState(this@JarvisConversationService, ConversationState.IDLE)
                                         } else {
                                             // Generative AI Turn: Stream to Gemini Live with 6-second auto-fallback to GeminiRestClient
-                                            setConversationState(ConversationState.THINKING)
+                                            stateMachine?.onProcessingStart(stateMachine?.currentTurnId ?: 0L, "GENERATIVE_AI_TURN")
+                                            setConversationState(ConversationState.THINKING, "Awaiting Gemini Response")
                                             com.jarvis.assistant.island.OriginIslandController.updateVoiceState(this@JarvisConversationService, ConversationState.THINKING)
                                             com.jarvis.assistant.audio.diagnostics.VoicePipelineDiagnostics.markStage(
                                                 com.jarvis.assistant.audio.diagnostics.VoicePipelineDiagnostics.PipelineStage.MODEL_REQUEST_START,
@@ -1797,11 +1834,16 @@ class JarvisConversationService : Service() {
                                                                 jarvisText = reply
                                                             )
 
-                                                            setConversationState(ConversationState.SPEAKING)
+                                                            setConversationState(ConversationState.SPEAKING, "REST_FALLBACK_SPEAKING")
                                                             com.jarvis.assistant.island.OriginIslandController.updateVoiceState(this@JarvisConversationService, ConversationState.SPEAKING)
                                                             speakImmediateVoiceResponse(reply) {
-                                                                setConversationState(ConversationState.IDLE)
-                                                                com.jarvis.assistant.island.OriginIslandController.updateVoiceState(this@JarvisConversationService, ConversationState.IDLE)
+                                                                if (_isSessionOn.value) {
+                                                                    stateMachine?.onPlaybackFinish(stateMachine?.currentTurnId ?: 0L, "REST_FALLBACK_DONE", continueListening = true)
+                                                                    setConversationState(ConversationState.LISTENING, "REST_FALLBACK_DONE")
+                                                                } else {
+                                                                    stateMachine?.onPlaybackFinish(stateMachine?.currentTurnId ?: 0L, "REST_FALLBACK_DONE", continueListening = false)
+                                                                    setConversationState(ConversationState.IDLE, "REST_FALLBACK_DONE")
+                                                                }
                                                                 currentTurnAssistantText.clear()
                                                                 currentTurnUserText.clear()
                                                                 _liveUserTranscript.value = ""

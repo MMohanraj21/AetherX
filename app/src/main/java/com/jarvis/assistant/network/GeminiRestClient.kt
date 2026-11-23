@@ -74,7 +74,7 @@ object GeminiRestClient {
 
                 put("generationConfig", JSONObject().apply {
                     put("temperature", 0.7)
-                    put("maxOutputTokens", 500)
+                    put("maxOutputTokens", 1200)
                 })
             }
 

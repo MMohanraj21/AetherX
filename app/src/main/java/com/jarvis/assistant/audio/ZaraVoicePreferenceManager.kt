@@ -145,27 +145,45 @@ object ZaraVoicePreferenceManager {
 
     private fun findStrictFemaleVoice(voices: Set<Voice>): Voice? {
         val usVoices = voices.filter { it.locale.language == "en" }
-        // 1. Look for explicit female markers
+        // 1. Look for explicit female markers in voice name
+        val explicitFemale = usVoices.firstOrNull { v ->
+            val name = v.name.lowercase(Locale.ROOT)
+            val isMale = name.contains("male") || name.contains("-m-") || name.contains("#male") ||
+                    name.contains("iom") || name.contains("iof") || name.contains("-guy") ||
+                    name.contains("david") || name.contains("george")
+            !isMale && (name.contains("female") || name.contains("fem") || name.contains("-f-") ||
+                    name.contains("#female") || name.contains("sfg") || name.contains("iog") ||
+                    name.contains("iol") || name.contains("tpf") || name.contains("samantha") ||
+                    name.contains("victoria") || name.contains("zira"))
+        }
+        if (explicitFemale != null) return explicitFemale
+
+        // 2. Look for features attribute containing female
         return usVoices.firstOrNull { v ->
-            val name = v.name.lowercase(Locale.ROOT)
-            name.contains("female") || name.contains("fem") || name.contains("-f-") || name.contains("#female")
-        } ?: usVoices.firstOrNull { v ->
-            // Reject any male voice explicitly
-            val name = v.name.lowercase(Locale.ROOT)
-            !name.contains("male") && !name.contains("-m-") && !name.contains("#male") && !name.contains("-guy")
+            val feats = v.features?.joinToString(",")?.lowercase(Locale.ROOT).orEmpty()
+            feats.contains("gender=female") || feats.contains("female")
         }
     }
 
     private fun findStrictMaleVoice(voices: Set<Voice>): Voice? {
         val usVoices = voices.filter { it.locale.language == "en" }
-        // 1. Look for explicit male markers
+        // 1. Look for explicit male markers in voice name
+        val explicitMale = usVoices.firstOrNull { v ->
+            val name = v.name.lowercase(Locale.ROOT)
+            val isFemale = name.contains("female") || name.contains("fem") || name.contains("-f-") ||
+                    name.contains("#female") || name.contains("sfg") || name.contains("iog") ||
+                    name.contains("iol") || name.contains("tpf") || name.contains("samantha") ||
+                    name.contains("victoria") || name.contains("zira")
+            !isFemale && (name.contains("male") || name.contains("-m-") || name.contains("#male") ||
+                    name.contains("iom") || name.contains("iof") || name.contains("-guy") ||
+                    name.contains("david") || name.contains("george") || name.contains("mark"))
+        }
+        if (explicitMale != null) return explicitMale
+
+        // 2. Look for features attribute containing male
         return usVoices.firstOrNull { v ->
-            val name = v.name.lowercase(Locale.ROOT)
-            name.contains("male") || name.contains("-m-") || name.contains("#male") || name.contains("-guy")
-        } ?: usVoices.firstOrNull { v ->
-            // Reject any female voice explicitly
-            val name = v.name.lowercase(Locale.ROOT)
-            !name.contains("female") && !name.contains("fem") && !name.contains("-f-") && !name.contains("#female")
+            val feats = v.features?.joinToString(",")?.lowercase(Locale.ROOT).orEmpty()
+            (feats.contains("gender=male") || feats.contains("male")) && !feats.contains("female")
         }
     }
 

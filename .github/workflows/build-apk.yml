@@ -97,33 +97,34 @@ jobs:
         if: github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v5.5.0
-          name: "Zara AI Assistant v5.5.0 — Master Stability Fix (Notification Stability & Strict Voice Lock)"
+          tag_name: v5.5.1
+          name: "Zara AI Assistant v5.5.1 — Conversation State Machine & Creator Identity Release"
           body: |
-            ### Zara AI Assistant v5.5.0 (Release Build 550)
-            Architected, Designed & Developed exclusively by Mohanraj (@Hexvora777).
+            ### Zara AI Assistant v5.5.1 (Release Build 551)
+            Founder & Lead Architect: Mohanraj (@Hexvora777).
             Official Connections:
+            - GitHub: https://github.com/Hexvora777
             - Telegram: https://t.me/Hexvora777
             - Instagram: https://instagram.com/Hexvora777
             - Motto: "Every identity has an origin. Mine is Mohanraj."
 
-            ### What's New in v5.5.0:
-            - **Notification Stability & Zero Service Interruptions (OFF/ON Bug Completely Fixed)**:
-              - Full root cause elimination of service auto-restart when phone notifications arrive.
-              - Unified `ZaraNotificationManager`: Single notification ID 41, single silent channel (`zara_live_service`), separation of `startForeground` vs `notify`.
-              - Resilient `AudioRecorder`: Handles audio focus ducking from notification chimes without tearing down or recreating `AudioRecord`. Comfort silence preserves Gemini Live stream continuity.
-              - Silent `NotificationEventManager`: Incoming notifications from WhatsApp/SMS are indexed silently into `NotificationRepository` without triggering unprompted speech or session state flips.
-              - Full Vivo Origin Island (OriginOS 6) & Android 16 Promoted Ongoing notification compliance.
-            - **Strict Voice Lock (`ZaraVoicePreferenceManager`)**:
+            ### What's New in v5.5.1:
+            - **Authoritative Conversation State Machine (`ZaraConversationStateMachine`)**:
+              - Complete elimination of rapid `LISTENING ↔ SPEAKING` switching and UI flickering.
+              - Authoritative state machine with `SessionId`, `TurnId`, and strict state validation.
+              - Unbroken conversational lifecycle: `IDLE -> LISTENING -> PROCESSING -> SPEAKING -> LISTENING`.
+              - Zero premature timeouts in `AudioPlayer`: tolerate network chunk delivery gaps up to 3000ms.
+              - Resilient near-field voice barge-in with loudspeaker echo rejection (0.45f threshold, 200ms sustained human speech filter).
+            - **Global Strict Voice Lock Synchronization**:
               - Male selected = Male only. Female selected = Female only.
-              - Absolute prohibition of automatic or cross-gender fallback across Gemini Live & Android TTS.
-              - Strict voice filtering (`findStrictFemaleVoice` / `findStrictMaleVoice`) + acoustic formant pitch modulation (1.08f / 0.90f).
-            - **Single Speech Output Controller (`ZaraSpeechOutputController`)**:
-              - Single speech arbiter guaranteeing zero voice overlap between Gemini Live audio and Android TTS.
-              - Automatically returns conversation state to `LISTENING` upon speech completion.
-            - **Continuous Conversation Protection**:
-              - Unbroken flow: `LISTENING -> PROCESSING -> SPEAKING -> LISTENING`.
-              - Microphone remains active indefinitely until explicit user verbal STOP command.
+              - Unified `voice` and `voiceGender` mutual synchronization in `AppPreferences` and `PersonaActivity`.
+              - Enhanced TTS voice filtering with explicit gender feature inspection and acoustic pitch locking (1.18f / 0.85f).
+              - Default voice synchronized to "Aoede" (Warm Female).
+            - **Full Creator Identity Dossier & Natural Multi-lingual Introductions**:
+              - Complete, rich creator introduction for "Who created you?", "Who is your developer?", "Who is Mohanraj?", "Tell me about your creator", and "உன்னை யார் உருவாக்கினார்கள்?".
+              - Detailed creator profile covering Mohanraj, BE CSE education, Pudukkottai hometown, proud Tamil roots, and his mission as Founder & Lead Architect of ZARA AI.
+              - 4–6 sentence minimum for simple inquiries, and full multi-paragraph dossier for detailed questions in English, Tamil, and Tanglish.
+              - Expanded REST client generation token budget to 1200 tokens.
           files: |
             artifacts/Zara-release.apk
             artifacts/Zara-debug.apk

@@ -141,6 +141,12 @@ class PersonaActivity : AppCompatActivity() {
         }
 
         val voice = getSelectedVoice()
+        val gender = if (com.jarvis.assistant.audio.ZaraVoicePreferenceManager.isFemaleVoice(voice)) {
+            com.jarvis.assistant.audio.ZaraVoicePreferenceManager.VoiceGender.FEMALE
+        } else {
+            com.jarvis.assistant.audio.ZaraVoicePreferenceManager.VoiceGender.MALE
+        }
+        com.jarvis.assistant.audio.ZaraVoicePreferenceManager.setSelectedGender(this, gender, voice)
         preferences.voice = voice
         preferences.personality = currentSelectedPersona
 
