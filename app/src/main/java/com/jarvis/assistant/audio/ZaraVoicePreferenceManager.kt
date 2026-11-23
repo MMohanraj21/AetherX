@@ -10,15 +10,15 @@ import java.util.Locale
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
- * ZARA AI — Strict User-Selected Voice Lock Manager
+ * ZARA AI — Strict User-Selected Voice Lock Manager (v5.5)
  *
- * Enforces Absolute Rule:
+ * Enforces Absolute Architectural Rules:
  * - Male selected = Male only.
  * - Female selected = Female only.
  * - Zero automatic or accidental gender switching across turns, sessions, app restarts,
  *   Gemini Live reconnections, confirmations, error messages, and background states.
- *
- * Manages both Gemini Live neural voice configuration and Android TextToSpeech synchronization.
+ * - If the selected voice is unavailable, report limitation instead of switching gender.
+ * - Manages both Gemini Live neural voice configuration and Android TextToSpeech synchronization separately.
  */
 object ZaraVoicePreferenceManager {
 
@@ -78,7 +78,7 @@ object ZaraVoicePreferenceManager {
 
     /**
      * Resolves the authoritative Gemini Live voice name.
-     * GUARANTEE: If FEMALE is selected, never returns a male voice. If MALE is selected, never returns a female voice.
+     * GUARANTEE: If FEMALE is selected, NEVER returns a male voice. If MALE is selected, NEVER returns a female voice.
      */
     fun getGeminiVoiceName(context: Context): String {
         val prefs = (context.applicationContext as? JarvisApp)?.preferences
@@ -100,6 +100,7 @@ object ZaraVoicePreferenceManager {
 
     /**
      * Synchronizes and applies the strict gender voice lock to Android TextToSpeech.
+     * Ensures pitch modulation and strict voice filtering prevent opposite-gender bleed.
      */
     fun applyVoiceToTts(context: Context, tts: TextToSpeech?) {
         tts ?: return
@@ -113,15 +114,15 @@ object ZaraVoicePreferenceManager {
                 val availableVoices = tts.voices
                 if (!availableVoices.isNullOrEmpty()) {
                     val matchingVoice = when (gender) {
-                        VoiceGender.FEMALE -> findFemaleVoice(availableVoices)
-                        VoiceGender.MALE -> findMaleVoice(availableVoices)
+                        VoiceGender.FEMALE -> findStrictFemaleVoice(availableVoices)
+                        VoiceGender.MALE -> findStrictMaleVoice(availableVoices)
                     }
 
                     if (matchingVoice != null) {
                         tts.voice = matchingVoice
                         Log.i(TAG, "Applied native TTS voice: ${matchingVoice.name} (Gender: ${gender.name})")
                     } else {
-                        Log.w(TAG, "No explicit ${gender.name} voice found in TTS engine; applying acoustic pitch modulation.")
+                        Log.w(TAG, "Strict voice lock: No explicit ${gender.name} voice profile found in system TTS. Retaining base engine with acoustic formant modulation.")
                     }
                 }
             }
@@ -142,29 +143,47 @@ object ZaraVoicePreferenceManager {
         }
     }
 
-    private fun findFemaleVoice(voices: Set<Voice>): Voice? {
+    private fun findStrictFemaleVoice(voices: Set<Voice>): Voice? {
         val usVoices = voices.filter { it.locale.language == "en" }
         // 1. Look for explicit female markers
         return usVoices.firstOrNull { v ->
             val name = v.name.lowercase(Locale.ROOT)
             name.contains("female") || name.contains("fem") || name.contains("-f-") || name.contains("#female")
         } ?: usVoices.firstOrNull { v ->
-            // Exclude explicit male markers
+            // Reject any male voice explicitly
             val name = v.name.lowercase(Locale.ROOT)
-            !name.contains("male") && !name.contains("-m-") && !name.contains("#male")
+            !name.contains("male") && !name.contains("-m-") && !name.contains("#male") && !name.contains("-guy")
         }
     }
 
-    private fun findMaleVoice(voices: Set<Voice>): Voice? {
+    private fun findStrictMaleVoice(voices: Set<Voice>): Voice? {
         val usVoices = voices.filter { it.locale.language == "en" }
         // 1. Look for explicit male markers
         return usVoices.firstOrNull { v ->
             val name = v.name.lowercase(Locale.ROOT)
-            name.contains("male") || name.contains("-m-") || name.contains("#male")
+            name.contains("male") || name.contains("-m-") || name.contains("#male") || name.contains("-guy")
         } ?: usVoices.firstOrNull { v ->
-            // Exclude explicit female markers
+            // Reject any female voice explicitly
             val name = v.name.lowercase(Locale.ROOT)
             !name.contains("female") && !name.contains("fem") && !name.contains("-f-") && !name.contains("#female")
         }
+    }
+
+    /**
+     * Inspects and returns the complete status of the voice selection lock for diagnostics.
+     */
+    fun getVoiceLockDiagnostics(context: Context): Map<String, Any> {
+        val gender = getSelectedGender(context)
+        val geminiVoice = getGeminiVoiceName(context)
+        val isCompliant = when (gender) {
+            VoiceGender.FEMALE -> isFemaleVoice(geminiVoice)
+            VoiceGender.MALE -> isMaleVoice(geminiVoice)
+        }
+        return mapOf(
+            "selectedGender" to gender.name,
+            "geminiVoice" to geminiVoice,
+            "isLockCompliant" to isCompliant,
+            "allowedVoices" to if (gender == VoiceGender.FEMALE) FEMALE_VOICES else MALE_VOICES
+        )
     }
 }

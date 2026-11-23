@@ -97,34 +97,33 @@ jobs:
         if: github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v5.3.0
-          name: "Zara AI Assistant v5.3.0 — Double Voice Fix & Intelligent Single Confirmation System"
+          tag_name: v5.5.0
+          name: "Zara AI Assistant v5.5.0 — Master Stability Fix (Notification Stability & Strict Voice Lock)"
           body: |
-            ### Zara AI Assistant v5.3.0 (Release Build 530)
+            ### Zara AI Assistant v5.5.0 (Release Build 550)
             Architected, Designed & Developed exclusively by Mohanraj (@Hexvora777).
             Official Connections:
             - Telegram: https://t.me/Hexvora777
             - Instagram: https://instagram.com/Hexvora777
             - Motto: "Every identity has an origin. Mine is Mohanraj."
 
-            ### What's New in v5.3.0:
-            - **Single Voice Output Architecture (Double Voice Completely Fixed)**:
-              - Full audit of all audio output engines (Gemini Live Audio vs Android TextToSpeech).
-              - Authoritative Speech Arbiter (`voiceOutputLock`): When Gemini Live streams generated audio, secondary Android TTS reading of the transcript is suppressed.
-              - When Gemini returns text only (REST fallback `GeminiRestClient`), the configured Zara TTS speaks authoritatively without late streaming audio collision.
-              - Immediate barge-in & interruption: Flushes both AudioTrack and TTS instantly when user speaks.
-              - Preserves existing Zara voice identity, pitch, and timbre.
-            - **Intelligent Single Confirmation System**:
-              - Eliminates repeated confirmation questions ("Send pannava?", "Send pannattuma?", "Should I send it?", "Are you sure?").
-              - Unified `IntelligentConfirmationManager` with Risk-Based Confirmation Policy:
-                - **Category A (No Confirmation Needed)**: Open Instagram, Open ChatGPT, Open YouTube, Tell time, Check battery, Music controls execute immediately in < 50ms.
-                - **Category B (Single Confirmation)**: WhatsApp messages, Notification replies, SMS ask EXACTLY ONCE ("Rahul-kku WhatsApp message send pannava?"). User says "Yes" -> executes once immediately ("Message sent successfully."). User says "No" -> cancels immediately ("Okay, message cancelled.").
-                - **Category C (Strong Confirmation)**: Sensitive and destructive actions safeguarded with explicit authorization.
-            - **Duplicate Execution Protection**:
-              - Unique request IDs, action IDs, single-use authentication tokens.
-              - Idempotency filter with 30s TTL prevents duplicate messages from duplicate tool callbacks or retries.
-            - **Acceptance Test Suite**:
-              - Verified with automated acceptance tests covering all 10 voice and confirmation scenarios.
+            ### What's New in v5.5.0:
+            - **Notification Stability & Zero Service Interruptions (OFF/ON Bug Completely Fixed)**:
+              - Full root cause elimination of service auto-restart when phone notifications arrive.
+              - Unified `ZaraNotificationManager`: Single notification ID 41, single silent channel (`zara_live_service`), separation of `startForeground` vs `notify`.
+              - Resilient `AudioRecorder`: Handles audio focus ducking from notification chimes without tearing down or recreating `AudioRecord`. Comfort silence preserves Gemini Live stream continuity.
+              - Silent `NotificationEventManager`: Incoming notifications from WhatsApp/SMS are indexed silently into `NotificationRepository` without triggering unprompted speech or session state flips.
+              - Full Vivo Origin Island (OriginOS 6) & Android 16 Promoted Ongoing notification compliance.
+            - **Strict Voice Lock (`ZaraVoicePreferenceManager`)**:
+              - Male selected = Male only. Female selected = Female only.
+              - Absolute prohibition of automatic or cross-gender fallback across Gemini Live & Android TTS.
+              - Strict voice filtering (`findStrictFemaleVoice` / `findStrictMaleVoice`) + acoustic formant pitch modulation (1.08f / 0.90f).
+            - **Single Speech Output Controller (`ZaraSpeechOutputController`)**:
+              - Single speech arbiter guaranteeing zero voice overlap between Gemini Live audio and Android TTS.
+              - Automatically returns conversation state to `LISTENING` upon speech completion.
+            - **Continuous Conversation Protection**:
+              - Unbroken flow: `LISTENING -> PROCESSING -> SPEAKING -> LISTENING`.
+              - Microphone remains active indefinitely until explicit user verbal STOP command.
           files: |
             artifacts/Zara-release.apk
             artifacts/Zara-debug.apk

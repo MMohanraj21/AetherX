@@ -55,39 +55,15 @@ object NotificationEventManager {
         announcedNotificationHashes[notifHash] = now
         trimOldHashes(now)
 
-        val service = JarvisConversationService.activeInstance ?: return
-
         // Notification Event Isolation:
-        // An incoming notification from WhatsApp, SMS, email, etc. MUST NOT:
-        // - Stop Zara, restart Zara, reset conversation, release microphone, or speak over the user!
-        // During an active continuous voice conversation, store silently in repository without interrupting.
-        if (JarvisConversationService.isSessionOn.value) {
-            Log.i(TAG, "Active conversation session in progress; notification from ${item.appName} isolated and recorded silently.")
-            return
-        }
-
-        // Do not interrupt active phone call
-        val telecomManager = context.getSystemService(Context.TELECOM_SERVICE) as? android.telecom.TelecomManager
-        val telephonyManager = context.getSystemService(Context.TELEPHONY_SERVICE) as? android.telephony.TelephonyManager
-        if (telephonyManager?.callState != android.telephony.TelephonyManager.CALL_STATE_IDLE) {
-            Log.i(TAG, "Cellular call active, queuing notification silently.")
-            return
-        }
-
-        scope.launch {
-            _pendingReply.value = PendingReplySession(item)
-
-            val announcement = if (item.canReply) {
-                "Sir, ${item.sender} sent you a message: '${item.text}'. Would you like to reply?"
-            } else {
-                "Sir, notification from ${item.appName}: ${item.sender} says '${item.text}'."
-            }
-
-            Log.i(TAG, "Announcing notification via ZARA voice: $announcement")
-            service.speakImmediateVoiceResponse(announcement) {
-                OriginIslandController.startListening(context)
-            }
-        }
+        // Incoming notifications (WhatsApp, SMS, System, etc.) MUST NEVER:
+        // 1. Interrupt an active voice conversation.
+        // 2. Restart or stop JarvisConversationService.
+        // 3. Force unsolicited voice readouts that bounce Zara between states.
+        // 4. Trigger audio record or websocket recreation.
+        // All incoming notifications are recorded cleanly in NotificationRepository
+        // for on-demand query by ZARA AI when the user asks.
+        Log.i(TAG, "Notification received and stored in repository: [${item.appName}] ${item.sender}")
     }
 
     fun onNotificationRemoved(key: String) {

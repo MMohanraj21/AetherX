@@ -123,10 +123,17 @@ class AudioRecorder(
                                 }
                             } else if (readBytes < 0) {
                                 consecutiveErrors++
-                                Log.w(TAG, "AudioRecord read error code: $readBytes (error count: $consecutiveErrors)")
-                                delay(40)
-                                if (consecutiveErrors > 10 && isRecording.get()) {
-                                    Log.e(TAG, "Consecutive AudioRecord read errors exceeded limit. Attempting auto-recovery...")
+                                if (consecutiveErrors % 20 == 1) {
+                                    Log.w(TAG, "AudioRecord read ducked/error: $readBytes (count: $consecutiveErrors)")
+                                }
+                                // Feed comfort silence to maintain Gemini Live stream continuity during transient ducking
+                                if (!isMuted.get()) {
+                                    val silenceChunk = ByteArray(CHUNK_SIZE_BYTES)
+                                    onAudioChunk(silenceChunk, 0f, AudioFrequencyData())
+                                }
+                                delay(50)
+                                if (consecutiveErrors > 100 && isRecording.get()) {
+                                    Log.e(TAG, "Consecutive AudioRecord read errors exceeded 5 seconds. Attempting auto-recovery...")
                                     break
                                 }
                             }

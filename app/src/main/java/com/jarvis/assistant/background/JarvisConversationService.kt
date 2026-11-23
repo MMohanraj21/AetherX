@@ -95,8 +95,8 @@ class JarvisConversationService : Service() {
         const val ACTION_STOP = ACTION_STOP_ALL
         const val ACTION_ENTER_STANDBY = "com.jarvis.assistant.ENTER_STANDBY"
 
-        private const val CHANNEL_ID = "jarvis_conversation"
-        private const val NOTIFICATION_ID = 41
+        private const val CHANNEL_ID = com.jarvis.assistant.notification.ZaraNotificationManager.CHANNEL_ID
+        private const val NOTIFICATION_ID = com.jarvis.assistant.notification.ZaraNotificationManager.NOTIFICATION_ID
         private const val INACTIVITY_TIMEOUT_MS = 30 * 60 * 1000L // 30 minutes before standby
         private const val STANDBY_COOLDOWN_MS = 2500L
 
@@ -447,12 +447,7 @@ class JarvisConversationService : Service() {
     private fun setConversationState(state: ConversationState) {
         if (_conversationState.value != state) {
             _conversationState.value = state
-            if (_isSessionOn.value && !_isStandby.value) {
-                com.jarvis.assistant.island.OriginIslandController.updateVoiceState(this, state)
-            } else {
-                com.jarvis.assistant.island.OriginIslandController.dismiss(this)
-                updateNotification()
-            }
+            updateNotification()
         }
     }
 
@@ -536,6 +531,8 @@ class JarvisConversationService : Service() {
 
     // --- Standby / wake-word components (Pure Vosk) ---
     private var voskSpeechService: SpeechService? = null
+    private var speechOutputController: com.jarvis.assistant.audio.ZaraSpeechOutputController? = null
+    private val audioFocusController by lazy { com.jarvis.assistant.audio.realtime.AudioFocusController(this) }
     private var tts: TextToSpeech? = null
     private val ttsCallbacks = java.util.concurrent.ConcurrentHashMap<String, () -> Unit>()
     private val audioRingBuffer = com.jarvis.assistant.audio.AudioRingBuffer(capacityMs = 3000)
@@ -551,8 +548,10 @@ class JarvisConversationService : Service() {
     override fun onCreate() {
         super.onCreate()
         activeInstance = this
-        createChannel()
-        initTts()
+        speechOutputController = com.jarvis.assistant.audio.ZaraSpeechOutputController(this) { state ->
+            setConversationState(state)
+        }
+        ensureMicrophoneForegroundService()
         headsetAudioRouter = com.jarvis.assistant.audio.HeadsetAudioRouter(applicationContext)
         com.jarvis.assistant.island.ZaraIslandManager.getInstance(this).showIsland()
         com.jarvis.assistant.telecom.CallAssistantManager.getInstance(this).startListening()
@@ -649,79 +648,33 @@ class JarvisConversationService : Service() {
             onDone?.invoke()
             return
         }
-        serviceScope.launch(Dispatchers.Main) {
-            try {
-                synchronized(voiceOutputLock) {
-                    val isLiveSpeaking = audioPlayer?.isPlaying() == true || isGeminiLiveAudioActive || hasLiveAudioInCurrentTurn
-                    if (isLiveSpeaking) {
-                        Log.i("ZaraVoice", "Single Voice Arbiter: Suppressed secondary TTS playback ('$text') because Gemini Live audio is active.")
-                        onDone?.invoke()
-                        return@launch
-                    }
-
-                    // Flush any remaining pcm audio on audioPlayer
-                    audioPlayer?.flush()
-
-                    if (tts == null) {
-                        initTts()
-                    } else {
-                        com.jarvis.assistant.audio.ZaraVoicePreferenceManager.applyVoiceToTts(this@JarvisConversationService, tts)
-                    }
-                    val utteranceId = "zara_voice_${System.currentTimeMillis()}"
-                    if (onDone != null) {
-                        ttsCallbacks[utteranceId] = onDone
-                    }
-                    val params = Bundle().apply {
-                        putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, 1.0f)
-                    }
-                    Log.i("ZaraVoice", "Single Voice Arbiter: Speaking authoritative TTS: '$text'")
-                    tts?.speak(text, TextToSpeech.QUEUE_FLUSH, params, utteranceId)
-                }
-            } catch (e: Exception) {
-                Log.e("JarvisService", "Error in speakImmediateVoiceResponse: ${e.message}")
-                onDone?.invoke()
-            }
-        }
+        speechOutputController?.speakTts(text, onDone)
     }
 
     private fun ensureMicrophoneForegroundService() {
-        val notification = buildNotification()
-        var combinedTypes = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
-            android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE or
-            android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK
-        } else {
-            0
-        }
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q &&
-            com.jarvis.assistant.vision.ScreenCaptureManager.getInstance().isSharing.value) {
-            combinedTypes = combinedTypes or android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION
-        }
-
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
-            try {
-                startForeground(NOTIFICATION_ID, notification, combinedTypes)
-                Log.d("JarvisService", "startForeground elevated to types=$combinedTypes")
-            } catch (e: Exception) {
-                Log.w("JarvisService", "startForeground with combined types failed: ${e.message}")
-                try {
-                    startForeground(NOTIFICATION_ID, notification, android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE)
-                } catch (_: Exception) {
-                    try {
-                        startForeground(NOTIFICATION_ID, notification)
-                    } catch (_: Exception) {}
-                }
-            }
-        } else {
-            startForeground(NOTIFICATION_ID, notification)
+        if (!com.jarvis.assistant.notification.ZaraNotificationManager.isForegroundRunning()) {
+            val additionalTypes = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
+                com.jarvis.assistant.vision.ScreenCaptureManager.getInstance().isSharing.value) {
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION
+            } else 0
+            com.jarvis.assistant.notification.ZaraNotificationManager.startForegroundService(
+                service = this,
+                isStandby = _isStandby.value,
+                additionalTypes = additionalTypes
+            )
         }
     }
 
     fun elevateToMediaProjection(): Boolean {
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
-            val notification = buildNotification()
-            val types = android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE or
-                        android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK or
-                        android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val types = ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE or
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK or
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION
+            val notification = com.jarvis.assistant.notification.ZaraNotificationManager.buildNotification(
+                context = this,
+                state = _conversationState.value,
+                isStandby = _isStandby.value
+            )
             try {
                 startForeground(NOTIFICATION_ID, notification, types)
                 Log.i("JarvisService", "Foreground service elevated to include MEDIA_PROJECTION")
@@ -735,10 +688,14 @@ class JarvisConversationService : Service() {
     }
 
     fun demoteFromMediaProjection() {
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
-            val notification = buildNotification()
-            val types = android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE or
-                        android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val types = ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE or
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK
+            val notification = com.jarvis.assistant.notification.ZaraNotificationManager.buildNotification(
+                context = this,
+                state = _conversationState.value,
+                isStandby = _isStandby.value
+            )
             try {
                 startForeground(NOTIFICATION_ID, notification, types)
                 Log.i("JarvisService", "Foreground service demoted from MEDIA_PROJECTION")
@@ -875,6 +832,7 @@ class JarvisConversationService : Service() {
         currentTurnAssistantText.clear()
         currentTurnUserText.clear()
         acquireWakeLock()
+        audioFocusController.requestFocus(exclusive = false)
         com.jarvis.assistant.conversation.ContinuousConversationManager.startSession()
         startInactivityTimer()
         setConversationState(ConversationState.LISTENING)
@@ -887,9 +845,8 @@ class JarvisConversationService : Service() {
                     synchronized(voiceOutputLock) {
                         isGeminiLiveAudioActive = true
                         hasLiveAudioInCurrentTurn = true
-                        try { tts?.stop() } catch (_: Exception) {}
-                        ttsCallbacks.clear()
                     }
+                    speechOutputController?.onGeminiAudioStarted()
                     com.jarvis.assistant.conversation.ContinuousConversationManager.onSpeaking()
                     com.jarvis.assistant.audio.WakeWordManager.transitionTo(com.jarvis.assistant.audio.VoiceCycleState.SPEAKING, "Audio playback started")
                     setConversationState(ConversationState.SPEAKING)
@@ -897,6 +854,7 @@ class JarvisConversationService : Service() {
                     synchronized(voiceOutputLock) {
                         isGeminiLiveAudioActive = false
                     }
+                    speechOutputController?.onGeminiAudioFinished()
                     lastPlaybackEndTime = System.currentTimeMillis()
                     finalizeTurn()
                     com.jarvis.assistant.conversation.ContinuousConversationManager.onPlaybackFinished()
@@ -3455,6 +3413,7 @@ class JarvisConversationService : Service() {
 
     private fun enterStandby(announce: Boolean = false) {
         if (_isStandby.value) return
+        audioFocusController.releaseFocus()
         abandonAudioDuckFocus()
         com.jarvis.assistant.audio.JarvisSoundEffects.playStandbySound()
         isPendingBackgroundTransition = false
@@ -3922,7 +3881,9 @@ class JarvisConversationService : Service() {
         exitStandbyListening()
         _isStandby.value = false
         releaseWakeLock()
-        stopForeground(STOP_FOREGROUND_REMOVE)
+        speechOutputController?.release()
+        speechOutputController = null
+        com.jarvis.assistant.notification.ZaraNotificationManager.stopForegroundService(this)
         stopSelf()
     }
 
@@ -3962,6 +3923,9 @@ class JarvisConversationService : Service() {
         taskProgressOverlay = null
         stopActiveConversation()
         exitStandbyListening()
+        speechOutputController?.release()
+        speechOutputController = null
+        com.jarvis.assistant.notification.ZaraNotificationManager.stopForegroundService(this)
         try {
             tts?.stop()
             tts?.shutdown()
@@ -4062,67 +4026,31 @@ class JarvisConversationService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     private fun createChannel() {
-        (getSystemService(NOTIFICATION_SERVICE) as NotificationManager).createNotificationChannel(
-            NotificationChannel(CHANNEL_ID, "Zara", NotificationManager.IMPORTANCE_LOW)
-        )
+        // Managed exclusively by ZaraNotificationManager
     }
 
     private fun updateNotification() {
-        if (_isSessionOn.value && !_isStandby.value) {
-            val state = _conversationState.value
-            when (state) {
-                ConversationState.LISTENING -> com.jarvis.assistant.island.OriginIslandController.startListening(this)
-                ConversationState.THINKING -> com.jarvis.assistant.island.OriginIslandController.startThinking(this)
-                ConversationState.SPEAKING -> com.jarvis.assistant.island.OriginIslandController.startSpeaking(this)
-                ConversationState.IDLE -> com.jarvis.assistant.island.OriginIslandController.startListening(this)
-            }
-        } else {
-            postStandardStandbyNotification()
-        }
+        com.jarvis.assistant.notification.ZaraNotificationManager.updateNotification(
+            context = this,
+            state = _conversationState.value,
+            isStandby = _isStandby.value
+        )
     }
 
     fun postStandardStandbyNotification() {
-        val notification = buildNotification()
-        val nm = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            try {
-                startForeground(
-                    NOTIFICATION_ID,
-                    notification,
-                    ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
-                )
-            } catch (_: Exception) {
-                nm.notify(NOTIFICATION_ID, notification)
-            }
-        } else {
-            startForeground(NOTIFICATION_ID, notification)
-        }
+        com.jarvis.assistant.notification.ZaraNotificationManager.updateNotification(
+            context = this,
+            state = ConversationState.IDLE,
+            isStandby = true
+        )
     }
 
     private fun buildNotification(): android.app.Notification {
-        val (title, text) = when {
-            _isStandby.value -> "ZARA AI" to "Standby • Say \"Hey Zara\""
-            _isSessionOn.value -> "ZARA AI" to "Microphone active"
-            else -> "ZARA AI" to "Active"
-        }
-        val contentIntent = PendingIntent.getActivity(
-            this, 0, Intent(this, MainActivity::class.java),
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        return com.jarvis.assistant.notification.ZaraNotificationManager.buildNotification(
+            context = this,
+            state = _conversationState.value,
+            isStandby = _isStandby.value
         )
-        return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_zara_logo)
-            .setContentTitle(title)
-            .setContentText(text)
-            .setContentIntent(contentIntent)
-            .setOngoing(true)
-            .setOnlyAlertOnce(true)
-            .setPriority(NotificationCompat.PRIORITY_MIN)
-            .setCategory(NotificationCompat.CATEGORY_SERVICE)
-            .setShowWhen(false)
-            .addAction(0, "Stop", PendingIntent.getService(
-                this, 0, Intent(this, JarvisConversationService::class.java).setAction(ACTION_STOP_ALL),
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-            ))
-            .build()
+    }
     }
 }
