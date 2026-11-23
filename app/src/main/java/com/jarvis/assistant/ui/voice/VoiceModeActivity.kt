@@ -6,12 +6,12 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
+import com.jarvis.assistant.JarvisApp
 import com.jarvis.assistant.R
 import com.jarvis.assistant.audio.ZaraVoicePreferenceManager
 import com.jarvis.assistant.background.JarvisConversationService
 import com.jarvis.assistant.data.model.ConversationState
 import com.jarvis.assistant.databinding.ActivityVoiceModeBinding
-import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 
 class VoiceModeActivity : AppCompatActivity() {
@@ -39,7 +39,11 @@ class VoiceModeActivity : AppCompatActivity() {
 
         // Toggle Mic Mute
         binding.btnVoiceMicToggle.setOnClickListener {
-            JarvisConversationService.toggleMicMute()
+            val prefs = JarvisApp.instance.preferences
+            val newMuted = !prefs.isMicMuted
+            prefs.isMicMuted = newMuted
+            JarvisConversationService.setMicMuted(newMuted)
+            updateMicState(newMuted)
         }
 
         // Interrupt active speech
@@ -48,43 +52,38 @@ class VoiceModeActivity : AppCompatActivity() {
         }
 
         // Display current locked voice
-        val currentVoice = ZaraVoicePreferenceManager.getSelectedVoice(this)
+        val voiceName = ZaraVoicePreferenceManager.getGeminiVoiceName(this)
         val currentGender = ZaraVoicePreferenceManager.getSelectedGender(this)
         val genderShort = if (currentGender == ZaraVoicePreferenceManager.VoiceGender.FEMALE) "F" else "M"
-        binding.tvSelectedVoiceLock.text = "${currentVoice.displayName} ($genderShort)"
+        binding.tvSelectedVoiceLock.text = "$voiceName ($genderShort)"
 
         // Ensure session is started if not already running
         if (!JarvisConversationService.isSessionOn.value) {
             val startIntent = Intent(this, JarvisConversationService::class.java).apply {
-                action = JarvisConversationService.ACTION_START
+                action = JarvisConversationService.ACTION_START_CONVERSATION
             }
             startService(startIntent)
         }
 
+        updateMicState(JarvisApp.instance.preferences.isMicMuted)
         observeSessionState()
+    }
+
+    private fun updateMicState(isMuted: Boolean) {
+        if (isMuted) {
+            binding.ivVoiceMicStatus.setImageResource(R.drawable.ic_mic_mute_jarvis)
+            binding.ivVoiceMicStatus.setColorFilter(getColor(R.color.zara_status_error))
+        } else {
+            binding.ivVoiceMicStatus.setImageResource(R.drawable.ic_mic_jarvis)
+            binding.ivVoiceMicStatus.setColorFilter(getColor(R.color.zara_text_primary))
+        }
     }
 
     private fun observeSessionState() {
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 launch {
-                    combine(
-                        JarvisConversationService.conversationState,
-                        JarvisConversationService.isMicMuted,
-                        JarvisConversationService.isSessionOn
-                    ) { state, isMuted, isOn ->
-                        Triple(state, isMuted, isOn)
-                    }.collect { (state, isMuted, isOn) ->
-                        // Update Mic Mute Icon
-                        if (isMuted) {
-                            binding.ivVoiceMicStatus.setImageResource(R.drawable.ic_mic_mute_jarvis)
-                            binding.ivVoiceMicStatus.setColorFilter(getColor(R.color.zara_status_error))
-                        } else {
-                            binding.ivVoiceMicStatus.setImageResource(R.drawable.ic_mic_jarvis)
-                            binding.ivVoiceMicStatus.setColorFilter(getColor(R.color.zara_text_primary))
-                        }
-
-                        // Update State Indicator
+                    JarvisConversationService.conversationState.collect { state ->
                         when (state) {
                             ConversationState.LISTENING -> {
                                 binding.tvVoiceStateIndicator.text = "LISTENING (CONTINUOUS)"
