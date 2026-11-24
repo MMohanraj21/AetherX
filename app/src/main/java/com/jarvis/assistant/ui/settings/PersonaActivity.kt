@@ -1,6 +1,5 @@
 package com.jarvis.assistant.ui.settings
 
-import android.content.Intent
 import android.os.Bundle
 import android.text.Editable
 import android.text.TextWatcher
@@ -10,7 +9,6 @@ import com.jarvis.assistant.JarvisApp
 import com.jarvis.assistant.audio.ZaraVoicePreferenceManager
 import com.jarvis.assistant.data.model.GeminiConstants
 import com.jarvis.assistant.databinding.ActivityPersonaBinding
-import com.jarvis.assistant.ui.voice.VoiceStudioActivity
 import com.jarvis.assistant.util.ThemeManager
 
 class PersonaActivity : AppCompatActivity() {
@@ -34,7 +32,6 @@ class PersonaActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
-        updateVoiceCard()
         updatePersonaPreview()
     }
 
@@ -56,7 +53,9 @@ class PersonaActivity : AppCompatActivity() {
 
         binding.etUserName.setText(preferences.userName.ifBlank { "Mohanraj" })
 
-        updateVoiceCard()
+        val currentVoice = preferences.voice
+        selectVoice(currentVoice)
+
         updatePersonaPreview()
         binding.scrollPersona.post { binding.scrollPersona.scrollTo(0, 0) }
     }
@@ -84,25 +83,13 @@ class PersonaActivity : AppCompatActivity() {
             selectPersona(GeminiConstants.PERSONALITY_TECHGPT_X, updateVoiceDefault = false)
         }
 
-        val openVoiceStudioListener = {
-            startActivity(Intent(this, VoiceStudioActivity::class.java))
+        binding.rgVoices.setOnCheckedChangeListener { _, _ ->
+            updatePersonaPreview()
         }
-
-        binding.cardOpenVoiceStudio.setOnClickListener { openVoiceStudioListener() }
-        binding.cardActiveVoiceProfile.setOnClickListener { openVoiceStudioListener() }
-        binding.btnOpenVoiceStudioFull.setOnClickListener { openVoiceStudioListener() }
 
         binding.btnActivatePersona.setOnClickListener {
             saveAndActivate()
         }
-    }
-
-    private fun updateVoiceCard() {
-        if (!::binding.isInitialized) return
-        val profile = ZaraVoicePreferenceManager.getSelectedVoiceProfile(this)
-        binding.tvActiveVoiceName.text = profile.displayName
-        binding.tvActiveVoiceDesc.text = "${profile.description} • ${profile.gender.name} AI Voice"
-        binding.tvVoiceGenderBadge.text = "${profile.gender.name} LOCKED"
     }
 
     private fun selectPersona(personaKey: String, updateVoiceDefault: Boolean) {
@@ -115,16 +102,34 @@ class PersonaActivity : AppCompatActivity() {
 
         if (updateVoiceDefault) {
             when (personaKey) {
-                GeminiConstants.PERSONALITY_GIRLFRIEND -> {
-                    ZaraVoicePreferenceManager.setSelectedGender(this, ZaraVoicePreferenceManager.VoiceGender.FEMALE)
-                }
-                GeminiConstants.PERSONALITY_BOYFRIEND -> {
-                    ZaraVoicePreferenceManager.setSelectedGender(this, ZaraVoicePreferenceManager.VoiceGender.MALE)
-                }
+                GeminiConstants.PERSONALITY_GIRLFRIEND -> selectVoice("Aoede")
+                GeminiConstants.PERSONALITY_BOYFRIEND -> selectVoice("Fenrir")
+                GeminiConstants.PERSONALITY_TECHGPT_X -> selectVoice("Puck")
+                else -> selectVoice("Aoede")
             }
-            updateVoiceCard()
         }
         if (::binding.isInitialized) updatePersonaPreview()
+    }
+
+    private fun selectVoice(voiceName: String) {
+        when (voiceName.trim().lowercase()) {
+            "aoede" -> binding.rbVoiceAoede.isChecked = true
+            "kore" -> binding.rbVoiceKore.isChecked = true
+            "puck" -> binding.rbVoicePuck.isChecked = true
+            "fenrir" -> binding.rbVoiceFenrir.isChecked = true
+            "charon" -> binding.rbVoiceCharon.isChecked = true
+            else -> binding.rbVoiceAoede.isChecked = true
+        }
+    }
+
+    private fun getSelectedVoice(): String {
+        return when {
+            binding.rbVoiceAoede.isChecked -> "Aoede"
+            binding.rbVoiceKore.isChecked -> "Kore"
+            binding.rbVoiceFenrir.isChecked -> "Fenrir"
+            binding.rbVoiceCharon.isChecked -> "Charon"
+            else -> "Puck"
+        }
     }
 
     private fun updatePersonaPreview() {
@@ -135,7 +140,7 @@ class PersonaActivity : AppCompatActivity() {
             GeminiConstants.PERSONALITY_TECHGPT_X -> "Mohanraj"
             else -> "Zara Pro"
         }
-        val activeVoice = ZaraVoicePreferenceManager.getSelectedVoiceProfile(this).displayName
+        val activeVoice = getSelectedVoice()
         val operator = binding.etUserName.text?.toString()?.trim().takeUnless { it.isNullOrBlank() } ?: "Mohanraj"
         binding.tvPersonaPreview.text = "$persona · $activeVoice"
         binding.tvPersonaGreeting.text = "Ready to help, $operator."
@@ -145,9 +150,15 @@ class PersonaActivity : AppCompatActivity() {
         val userName = binding.etUserName.text?.toString()?.trim()
         preferences.userName = if (!userName.isNullOrBlank()) userName else "Mohanraj"
 
-        val activeProfile = ZaraVoicePreferenceManager.getSelectedVoiceProfile(this)
-        preferences.voice = activeProfile.id
-        preferences.voiceGender = activeProfile.gender.name
+        val voice = getSelectedVoice()
+        val gender = if (ZaraVoicePreferenceManager.isFemaleVoice(voice)) {
+            ZaraVoicePreferenceManager.VoiceGender.FEMALE
+        } else {
+            ZaraVoicePreferenceManager.VoiceGender.MALE
+        }
+        ZaraVoicePreferenceManager.setSelectedGender(this, gender, voice)
+        preferences.voice = voice
+        preferences.voiceGender = gender.name
         preferences.personality = currentSelectedPersona
 
         val personaDisplayName = when (currentSelectedPersona) {
@@ -159,7 +170,7 @@ class PersonaActivity : AppCompatActivity() {
 
         Toast.makeText(
             this,
-            "Activated: $personaDisplayName with ${activeProfile.displayName} Voice",
+            "Activated: $personaDisplayName with $voice Voice",
             Toast.LENGTH_LONG
         ).show()
 

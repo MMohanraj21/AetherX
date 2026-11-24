@@ -6,14 +6,17 @@ import com.jarvis.assistant.JarvisApp
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
- * ZARA AI — Premium AI Voice Library & Voice Lock Manager (v5.6)
+ * ZARA AI — Strict User-Selected Voice Lock Manager
  *
  * Exclusively powered by Gemini Live Native Neural Audio Generation.
- * All legacy Android TextToSpeech dependencies have been completely removed.
+ * All legacy Android TextToSpeech and 10-voice custom libraries have been removed.
+ *
+ * Supported Official Gemini Live Neural Voices:
+ * - Female: Aoede (Default), Kore
+ * - Male: Puck (Default), Charon, Fenrir
  *
  * Guarantees:
- * - Exactly 10 premium neural voices (5 Female, 5 Male).
- * - Strict Gender Lock: Female selected = Female only. Male selected = Male only.
+ * - Strict Gender Lock: Female selected = Female only (Aoede/Kore). Male selected = Male only (Puck/Charon/Fenrir).
  * - Zero automatic or accidental voice/gender switching.
  * - Persistent across sessions, reboots, and Gemini reconnects.
  */
@@ -26,98 +29,12 @@ object ZaraVoicePreferenceManager {
         MALE
     }
 
-    data class VoiceProfile(
-        val id: String,
-        val displayName: String,
-        val gender: VoiceGender,
-        val description: String,
-        val personalityStyle: String,
-        val sampleTamilText: String = "வணக்கம்! நான் Zara. எப்படி இருக்கீங்க? இன்று உங்களுக்கு என்ன உதவி செய்யட்டும்? உங்களுடன் பேசுவதில் எனக்கு மகிழ்ச்சி."
-    )
+    // Official Gemini Live neural voices strictly partitioned by gender
+    val FEMALE_VOICES = listOf("Aoede", "Kore")
+    val MALE_VOICES = listOf("Puck", "Charon", "Fenrir")
 
-    // Exact 5 Female AI Voices (Verified Gemini Live neural voice identifiers)
-    val FEMALE_PROFILES = listOf(
-        VoiceProfile(
-            id = "Sulafat",
-            displayName = "Sulafat",
-            gender = VoiceGender.FEMALE,
-            description = "Warm, sweet & pleasant",
-            personalityStyle = "Warm, melodious, and pleasant conversational tone with smooth Tamil cadence"
-        ),
-        VoiceProfile(
-            id = "Achernar",
-            displayName = "Achernar",
-            gender = VoiceGender.FEMALE,
-            description = "Soft, gentle & soothing",
-            personalityStyle = "Soft, soothing, and serene voice with relaxing and comforting inflection"
-        ),
-        VoiceProfile(
-            id = "Aoede",
-            displayName = "Aoede",
-            gender = VoiceGender.FEMALE,
-            description = "Breezy & conversational",
-            personalityStyle = "Breezy, natural, and highly expressive conversational rhythm"
-        ),
-        VoiceProfile(
-            id = "Vindemiatrix",
-            displayName = "Vindemiatrix",
-            gender = VoiceGender.FEMALE,
-            description = "Gentle & calm",
-            personalityStyle = "Poised, calm, and gentle tone with crystal-clear phonetic articulation"
-        ),
-        VoiceProfile(
-            id = "Zephyr",
-            displayName = "Zephyr",
-            gender = VoiceGender.FEMALE,
-            description = "Bright & clear",
-            personalityStyle = "Bright, vibrant, and clear higher-range voice with uplifting warmth"
-        )
-    )
-
-    // Exact 5 Male AI Voices (Verified Gemini Live neural voice identifiers)
-    val MALE_PROFILES = listOf(
-        VoiceProfile(
-            id = "Algieba",
-            displayName = "Algieba",
-            gender = VoiceGender.MALE,
-            description = "Smooth & refined",
-            personalityStyle = "Smooth, refined, and resonant lower-range voice with authoritative warmth"
-        ),
-        VoiceProfile(
-            id = "Achird",
-            displayName = "Achird",
-            gender = VoiceGender.MALE,
-            description = "Friendly & conversational",
-            personalityStyle = "Friendly, approachable, and natural everyday conversational male tone"
-        ),
-        VoiceProfile(
-            id = "Charon",
-            displayName = "Charon",
-            gender = VoiceGender.MALE,
-            description = "Clear & informative",
-            personalityStyle = "Calm, professional, articulate, and informative deep vocal depth"
-        ),
-        VoiceProfile(
-            id = "Umbriel",
-            displayName = "Umbriel",
-            gender = VoiceGender.MALE,
-            description = "Relaxed & easy-going",
-            personalityStyle = "Relaxed, easy-going, and natural tone with effortless conversational flow"
-        ),
-        VoiceProfile(
-            id = "Puck",
-            displayName = "Puck",
-            gender = VoiceGender.MALE,
-            description = "Energetic & upbeat",
-            personalityStyle = "Upbeat, energetic, and spirited male voice with lively dynamism"
-        )
-    )
-
-    val FEMALE_VOICES = FEMALE_PROFILES.map { it.id }
-    val MALE_VOICES = MALE_PROFILES.map { it.id }
-
-    const val DEFAULT_FEMALE_VOICE = "Sulafat"
-    const val DEFAULT_MALE_VOICE = "Algieba"
+    const val DEFAULT_FEMALE_VOICE = "Aoede" // Warm, natural, melodious female voice
+    const val DEFAULT_MALE_VOICE = "Puck"   // Engaging, crisp, natural male voice
 
     private val isLocked = AtomicBoolean(true)
 
@@ -127,18 +44,6 @@ object ZaraVoicePreferenceManager {
 
     fun isMaleVoice(voiceName: String): Boolean {
         return MALE_VOICES.any { it.equals(voiceName.trim(), ignoreCase = true) }
-    }
-
-    fun getVoiceProfiles(gender: VoiceGender): List<VoiceProfile> {
-        return if (gender == VoiceGender.FEMALE) FEMALE_PROFILES else MALE_PROFILES
-    }
-
-    fun getAllVoiceProfiles(): List<VoiceProfile> {
-        return FEMALE_PROFILES + MALE_PROFILES
-    }
-
-    fun getVoiceProfile(voiceId: String): VoiceProfile? {
-        return getAllVoiceProfiles().firstOrNull { it.id.equals(voiceId.trim(), ignoreCase = true) }
     }
 
     /**
@@ -192,31 +97,16 @@ object ZaraVoicePreferenceManager {
     }
 
     /**
-     * Maps the user-facing voice identifier to an official, verified Gemini Live
-     * prebuilt voice name accepted by Google's BidiGenerateContent WebSocket.
-     *
-     * Strict Gender Integrity:
-     * - Female voices ALWAYS map to a female prebuilt voice (Aoede, Kore, Leda, Zephyr).
-     * - Male voices ALWAYS map to a male prebuilt voice (Fenrir, Orus, Charon, Puck).
+     * Maps voice identifier to Gemini Live prebuilt voice name.
      */
     fun getGeminiLiveVoiceName(voiceId: String): String {
         return when (voiceId.trim().lowercase()) {
-            "sulafat" -> "Aoede"
-            "achernar" -> "Kore"
             "aoede" -> "Aoede"
-            "vindemiatrix" -> "Leda"
-            "zephyr" -> "Zephyr"
-
-            "algieba" -> "Fenrir"
-            "achird" -> "Orus"
-            "charon" -> "Charon"
-            "umbriel" -> "Charon"
-            "puck" -> "Puck"
-            "fenrir" -> "Fenrir"
             "kore" -> "Kore"
-            "leda" -> "Leda"
-            "orus" -> "Orus"
-            else -> if (isFemaleVoice(voiceId)) "Aoede" else "Puck"
+            "puck" -> "Puck"
+            "charon" -> "Charon"
+            "fenrir" -> "Fenrir"
+            else -> if (isFemaleVoice(voiceId)) DEFAULT_FEMALE_VOICE else DEFAULT_MALE_VOICE
         }
     }
 
@@ -224,13 +114,7 @@ object ZaraVoicePreferenceManager {
      * Resolves the verified Gemini Live WebSocket API voice identifier for the active session.
      */
     fun getLiveApiVoiceName(context: Context): String {
-        val userVoice = getGeminiVoiceName(context)
-        return getGeminiLiveVoiceName(userVoice)
-    }
-
-    fun getSelectedVoiceProfile(context: Context): VoiceProfile {
-        val name = getGeminiVoiceName(context)
-        return getVoiceProfile(name) ?: FEMALE_PROFILES.first()
+        return getGeminiVoiceName(context)
     }
 
     /**
@@ -248,8 +132,7 @@ object ZaraVoicePreferenceManager {
             "geminiVoice" to geminiVoice,
             "isLockCompliant" to isCompliant,
             "allowedVoices" to if (gender == VoiceGender.FEMALE) FEMALE_VOICES else MALE_VOICES,
-            "voiceEngine" to "Gemini Live Native Audio (24kHz PCM)",
-            "androidTtsStatus" to "PERMANENTLY_REMOVED"
+            "voiceEngine" to "Gemini Live Native Audio (24kHz PCM)"
         )
     }
 }

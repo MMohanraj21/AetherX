@@ -97,22 +97,23 @@ jobs:
         if: github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v5.6.3
-          name: "Zara AI Assistant v5.6.3 — Genuine Gemini Neural Voice Auditions & Zero TextToSpeech"
+          tag_name: v5.6.4
+          name: "Zara AI Assistant v5.6.4 — Pure Native Gemini Voices & Studio Purge"
           body: |
-            ### Zara AI Assistant v5.6.3 (Release Build 563)
+            ### Zara AI Assistant v5.6.4 (Release Build 564)
             Founder & Lead Architect: Mohanraj (@Hexvora777).
 
-            ### Fixes & Enhancements in v5.6.3:
-            - **Genuine Gemini Neural AI Voice Auditions in Voice Studio**:
-              - Exclusively powered by Google Gemini 2.0 Flash Audio API using the user's Gemini API key.
-              - Zero robotic TextToSpeech / Google Translate TTS audio: all 10 voices preview with authentic Gemini AI neural speech in conversational Tamil (ta-IN).
-              - Automatic 24kHz 16-bit Mono WAV container packaging (`wrapPcmInWav`) in `GeminiRestClient.kt` ensuring pristine hardware-accelerated playback via Android `MediaPlayer`.
-              - Persistent local disk caching (`gemini_audition_<voiceId>.wav`) for instantaneous subsequent auditions without network latency or duplicate API calls.
-              - Responsive Voice Studio UI: real-time "Loading..." state during voice generation and clear guidance if API key is unconfigured.
-            - **Zero False Completions (Truthfulness & Action Verification)**:
-              - Verified fix in `MessageExecutionGate.kt` and `IntelligentConfirmationManager.kt` preventing premature action completion reports.
+            ### Fixes & Enhancements in v5.6.4:
+            - **Reverted to Original Default Gemini Voices**:
+              - Completely removed the 10 custom voice profiles and Voice Studio screen as requested.
+              - Restored pure official Google Gemini Live neural voices:
+                - Female: `Aoede` (Default Female - Warm, natural, melodious), `Kore` (Gentle, soothing)
+                - Male: `Puck` (Default Male - Engaging, witty, dynamic), `Charon` (Distinguished butler), `Fenrir` (Deep, protective)
+              - Clean Persona & Voice Selection: Directly integrated into Persona Settings with instant voice selection and strict gender locks.
+            - **Zero False Completions & WhatsApp Privacy Auto-Unlock**:
+              - Full preservation of zero-hallucination WhatsApp execution gate (`MessageExecutionGate.kt`).
               - Full WhatsApp Privacy PIN auto-unlock and in-app search fallback working seamlessly on Vivo OriginOS 6 (Android 16).
+              - All 32 registered backend tools, Origin Island, and continuous conversation preserved.
           files: |
             artifacts/Zara-release.apk
             artifacts/Zara-debug.apk

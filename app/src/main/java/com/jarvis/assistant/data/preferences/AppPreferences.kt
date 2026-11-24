@@ -248,12 +248,12 @@ class AppPreferences(context: Context) {
 
     var voice: String
         get() {
-            val v = prefs.getString(KEY_VOICE, "Sulafat") ?: "Sulafat"
+            val v = prefs.getString(KEY_VOICE, "Aoede") ?: "Aoede"
             val gender = voiceGender
             return if (gender == "FEMALE") {
-                if (com.jarvis.assistant.audio.ZaraVoicePreferenceManager.isFemaleVoice(v)) v else "Sulafat"
+                if (com.jarvis.assistant.audio.ZaraVoicePreferenceManager.isFemaleVoice(v)) v else "Aoede"
             } else {
-                if (com.jarvis.assistant.audio.ZaraVoicePreferenceManager.isMaleVoice(v)) v else "Algieba"
+                if (com.jarvis.assistant.audio.ZaraVoicePreferenceManager.isMaleVoice(v)) v else "Puck"
             }
         }
         set(value) {
@@ -275,9 +275,9 @@ class AppPreferences(context: Context) {
             val gender = if (value.equals("MALE", ignoreCase = true)) "MALE" else "FEMALE"
             val currentVoice = prefs.getString(KEY_VOICE, "") ?: ""
             val resolvedVoice = if (gender == "FEMALE") {
-                if (com.jarvis.assistant.audio.ZaraVoicePreferenceManager.isFemaleVoice(currentVoice)) currentVoice else "Sulafat"
+                if (com.jarvis.assistant.audio.ZaraVoicePreferenceManager.isFemaleVoice(currentVoice)) currentVoice else "Aoede"
             } else {
-                if (com.jarvis.assistant.audio.ZaraVoicePreferenceManager.isMaleVoice(currentVoice)) currentVoice else "Algieba"
+                if (com.jarvis.assistant.audio.ZaraVoicePreferenceManager.isMaleVoice(currentVoice)) currentVoice else "Puck"
             }
             prefs.edit()
                 .putString(KEY_VOICE_GENDER, gender)
