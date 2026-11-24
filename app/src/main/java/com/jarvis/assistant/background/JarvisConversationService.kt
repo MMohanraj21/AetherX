@@ -240,6 +240,10 @@ class JarvisConversationService : Service() {
     // --- Active-conversation components ---
     private var audioRecorder: AudioRecorder? = null
     private var audioPlayer: AudioPlayer? = null
+    fun getAudioPlayer(): AudioPlayer? = audioPlayer
+    fun playNativeAudio(pcmData: ByteArray) {
+        audioPlayer?.enqueueAudio(pcmData)
+    }
     private var liveWebSocket: GeminiLiveWebSocket? = null
     fun getLiveWebSocket(): GeminiLiveWebSocket? = liveWebSocket
     private var inactivityJob: Job? = null

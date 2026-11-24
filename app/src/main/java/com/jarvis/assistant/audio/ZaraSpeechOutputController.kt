@@ -89,7 +89,7 @@ class ZaraSpeechOutputController(
                             val audioBytes = result.getOrNull()
                             if (audioBytes != null && audioBytes.isNotEmpty()) {
                                 onGeminiAudioStarted()
-                                service.audioPlayer?.enqueueAudio(audioBytes)
+                                service.playNativeAudio(audioBytes)
                                 val durationMs = (audioBytes.size * 1000L) / (AudioPlayer.SAMPLE_RATE * 2)
                                 delay(durationMs + 250)
                                 onGeminiAudioFinished()
