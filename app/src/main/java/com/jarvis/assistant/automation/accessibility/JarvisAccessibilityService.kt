@@ -1322,21 +1322,189 @@ class JarvisAccessibilityService : AccessibilityService() {
     }
 
     // ---------------------------------------------------------------
-    // WhatsApp Clean Automation (Fixed: Immediately stops, never clicks mic)
+    // WhatsApp Automation with Privacy PIN Unlock & In-App Contact Search
     // ---------------------------------------------------------------
 
+    fun isAppLockOrPinScreen(root: AccessibilityNodeInfo): Boolean {
+        val pkg = root.packageName?.toString()?.lowercase() ?: ""
+        if (pkg.contains("upslide") || pkg.contains("appfilter") ||
+            pkg.contains("vivo.security") || pkg.contains("safecenter")) {
+            return true
+        }
+        val allTexts = mutableListOf<String>()
+        collectAllTexts(root, allTexts)
+        val joined = allTexts.joinToString(" ").lowercase()
+        return joined.contains("privacy password") || joined.contains("enter pin") ||
+                joined.contains("app lock") || joined.contains("whatsapp locked") ||
+                joined.contains("chat locked") || joined.contains("touch the fingerprint") ||
+                joined.contains("use pin") || joined.contains("enter your pin") ||
+                joined.contains("தனியுரிமை") || joined.contains("கடவுச்சொல்") ||
+                joined.contains("பின்")
+    }
+
+    fun performPinUnlock(root: AccessibilityNodeInfo, pin: String): Boolean {
+        if (pin.isBlank()) return false
+        Log.i(TAG, "Attempting privacy PIN unlock for WhatsApp...")
+
+        // If fingerprint sensor dialog shows "Use PIN" or "Cancel", tap "Use PIN"
+        val usePinNode = findNodeMatchingAnyText(root, listOf("use pin", "pin", "enter pin", "use password", "பின்னை உள்ளிடு"))
+        if (usePinNode != null) {
+            tapNodeOrParent(usePinNode)
+            try { Thread.sleep(300) } catch (_: Exception) {}
+        }
+
+        // Strategy 1: Look for an editable password / PIN field
+        val passwordField = findPinOrPasswordField(root)
+        if (passwordField != null) {
+            val args = Bundle().apply {
+                putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, pin)
+            }
+            val ok = passwordField.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args)
+            Log.i(TAG, "Set PIN text via ACTION_SET_TEXT: $ok")
+            try { Thread.sleep(200) } catch (_: Exception) {}
+
+            val confirmBtn = findConfirmOrOkButton(root)
+            if (confirmBtn != null) {
+                tapNodeOrParent(confirmBtn)
+            }
+            return ok
+        }
+
+        // Strategy 2: Numeric keypad button tapping (for Vivo custom lock screen / dialpad 0-9)
+        var anyTapped = false
+        for (char in pin) {
+            if (char.isDigit()) {
+                val digitNode = findKeypadDigitButton(root, char.toString())
+                if (digitNode != null) {
+                    tapNodeOrParent(digitNode)
+                    anyTapped = true
+                    try { Thread.sleep(120) } catch (_: Exception) {}
+                }
+            }
+        }
+
+        // Strategy 3: Check for Confirm / OK button after typing digits
+        val confirmBtn = findConfirmOrOkButton(root)
+        if (confirmBtn != null) {
+            tapNodeOrParent(confirmBtn)
+            Log.i(TAG, "Tapped Confirm/OK button on PIN lock screen.")
+        }
+
+        return anyTapped
+    }
+
+    private fun collectAllTexts(node: AccessibilityNodeInfo, list: MutableList<String>) {
+        val t = node.text?.toString()?.trim()
+        if (!t.isNullOrEmpty()) list.add(t)
+        val d = node.contentDescription?.toString()?.trim()
+        if (!d.isNullOrEmpty()) list.add(d)
+        for (i in 0 until node.childCount) {
+            val child = node.getChild(i) ?: continue
+            collectAllTexts(child, list)
+        }
+    }
+
+    private fun findPinOrPasswordField(node: AccessibilityNodeInfo): AccessibilityNodeInfo? {
+        val className = node.className?.toString() ?: ""
+        val viewId = node.viewIdResourceName?.lowercase() ?: ""
+        if (node.isPassword || (className.contains("EditText", ignoreCase = true) &&
+            (viewId.contains("pin") || viewId.contains("pass") || viewId.contains("pwd") || viewId.contains("lock")))) {
+            return node
+        }
+        for (i in 0 until node.childCount) {
+            val child = node.getChild(i) ?: continue
+            val found = findPinOrPasswordField(child)
+            if (found != null) return found
+        }
+        if (className.contains("EditText", ignoreCase = true) && node.isEditable) {
+            return node
+        }
+        return null
+    }
+
+    private fun findKeypadDigitButton(node: AccessibilityNodeInfo, digit: String): AccessibilityNodeInfo? {
+        val text = node.text?.toString()?.trim() ?: ""
+        val desc = node.contentDescription?.toString()?.trim() ?: ""
+        val viewId = node.viewIdResourceName?.lowercase() ?: ""
+
+        if ((text == digit || desc == digit || viewId.endsWith("_$digit") || viewId.endsWith("key_$digit") || viewId.endsWith("digit_$digit")) &&
+            (node.isClickable || node.parent?.isClickable == true)) {
+            return node
+        }
+        for (i in 0 until node.childCount) {
+            val child = node.getChild(i) ?: continue
+            val found = findKeypadDigitButton(child, digit)
+            if (found != null) return found
+        }
+        return null
+    }
+
+    private fun findConfirmOrOkButton(node: AccessibilityNodeInfo): AccessibilityNodeInfo? {
+        val text = node.text?.toString()?.lowercase()?.trim() ?: ""
+        val desc = node.contentDescription?.toString()?.lowercase()?.trim() ?: ""
+        val viewId = node.viewIdResourceName?.lowercase() ?: ""
+
+        if (text in listOf("ok", "confirm", "done", "enter", "next", "உறுதி") ||
+            desc in listOf("ok", "confirm", "done", "enter", "next") ||
+            viewId.endsWith("confirm") || viewId.endsWith("btn_ok") || viewId.endsWith("done") || viewId.endsWith("submit")) {
+            if (node.isClickable || node.parent?.isClickable == true) {
+                return node
+            }
+        }
+        for (i in 0 until node.childCount) {
+            val child = node.getChild(i) ?: continue
+            val found = findConfirmOrOkButton(child)
+            if (found != null) return found
+        }
+        return null
+    }
+
+    private fun findNodeMatchingAnyText(node: AccessibilityNodeInfo, keywords: List<String>): AccessibilityNodeInfo? {
+        val text = node.text?.toString()?.lowercase() ?: ""
+        val desc = node.contentDescription?.toString()?.lowercase() ?: ""
+        for (kw in keywords) {
+            if (text.contains(kw) || desc.contains(kw)) {
+                if (node.isClickable || node.parent?.isClickable == true) {
+                    return node
+                }
+            }
+        }
+        for (i in 0 until node.childCount) {
+            val child = node.getChild(i) ?: continue
+            val found = findNodeMatchingAnyText(child, keywords)
+            if (found != null) return found
+        }
+        return null
+    }
+
     /**
-     * Monitors the screen after a WhatsApp deep-link is launched and automatically taps the Send button
-     * (content-desc="Send" or id="send" or send icon) for hands-free message delivery.
-     * Stops polling immediately after clicking to avoid clicking the microphone icon.
+     * Monitors the screen after a WhatsApp deep-link is launched, unlocks privacy PIN if present,
+     * and automatically taps the Send button.
      */
-    fun scheduleWhatsAppAutoSend() {
+    fun scheduleWhatsAppAutoSend(pin: String? = null) {
+        val targetPin = pin?.takeIf { it.isNotBlank() }
+            ?: com.jarvis.assistant.data.preferences.AppPreferences(this).whatsappPin
         val mainHandler = Handler(Looper.getMainLooper())
         mainHandler.postDelayed(object : Runnable {
             var attempts = 0
+            var unlocked = false
+
             override fun run() {
                 val root = rootInActiveWindow
                 if (root != null) {
+                    if (isAppLockOrPinScreen(root)) {
+                        if (!unlocked && targetPin.isNotBlank()) {
+                            Log.i(TAG, "WhatsApp privacy lock screen active! Performing PIN unlock...")
+                            performPinUnlock(root, targetPin)
+                            unlocked = true
+                        }
+                        attempts++
+                        if (attempts < 20) {
+                            mainHandler.postDelayed(this, 350)
+                        }
+                        return
+                    }
+
                     val sendNode = findWhatsAppSendButton(root)
                     if (sendNode != null) {
                         tapNodeOrParent(sendNode)
@@ -1346,11 +1514,174 @@ class JarvisAccessibilityService : AccessibilityService() {
                 }
 
                 attempts++
-                if (attempts < 14) {
-                    mainHandler.postDelayed(this, 300)
+                if (attempts < 18) {
+                    mainHandler.postDelayed(this, 350)
                 }
             }
         }, 500)
+    }
+
+    /**
+     * Automated in-app WhatsApp search and message sender:
+     * Unlocks PIN -> Taps Search -> Enters Contact Name -> Selects Chat -> Enters Message -> Taps Send.
+     */
+    fun scheduleWhatsAppSearchAndSend(recipientName: String, messageText: String, pin: String? = null) {
+        val targetPin = pin?.takeIf { it.isNotBlank() }
+            ?: com.jarvis.assistant.data.preferences.AppPreferences(this).whatsappPin
+        val mainHandler = Handler(Looper.getMainLooper())
+
+        var stage = 0 // 0: unlock/check, 1: tap search, 2: type recipient, 3: tap contact, 4: type message, 5: tap send
+        var attempts = 0
+
+        mainHandler.postDelayed(object : Runnable {
+            override fun run() {
+                val root = rootInActiveWindow
+                if (root != null) {
+                    if (isAppLockOrPinScreen(root)) {
+                        if (targetPin.isNotBlank()) {
+                            Log.i(TAG, "Unlocking WhatsApp PIN before search...")
+                            performPinUnlock(root, targetPin)
+                        }
+                        attempts++
+                        if (attempts < 25) mainHandler.postDelayed(this, 400)
+                        return
+                    }
+
+                    when (stage) {
+                        0, 1 -> {
+                            val searchBtn = findWhatsAppSearchButton(root)
+                            if (searchBtn != null) {
+                                tapNodeOrParent(searchBtn)
+                                Log.i(TAG, "Tapped WhatsApp search icon.")
+                                stage = 2
+                                attempts = 0
+                                mainHandler.postDelayed(this, 450)
+                                return
+                            }
+                        }
+                        2 -> {
+                            val searchInput = findWhatsAppSearchInput(root)
+                            if (searchInput != null) {
+                                val args = Bundle().apply {
+                                    putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, recipientName)
+                                }
+                                searchInput.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args)
+                                Log.i(TAG, "Typed '$recipientName' into WhatsApp search.")
+                                stage = 3
+                                attempts = 0
+                                mainHandler.postDelayed(this, 600)
+                                return
+                            }
+                        }
+                        3 -> {
+                            val contactNode = findWhatsAppSearchResultContact(root, recipientName)
+                            if (contactNode != null) {
+                                tapNodeOrParent(contactNode)
+                                Log.i(TAG, "Tapped contact for '$recipientName'.")
+                                stage = 4
+                                attempts = 0
+                                mainHandler.postDelayed(this, 500)
+                                return
+                            }
+                        }
+                        4 -> {
+                            val entryBox = findWhatsAppMessageEntry(root)
+                            if (entryBox != null) {
+                                val args = Bundle().apply {
+                                    putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, messageText)
+                                }
+                                entryBox.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args)
+                                Log.i(TAG, "Typed message into chat entry box.")
+                                stage = 5
+                                attempts = 0
+                                mainHandler.postDelayed(this, 300)
+                                return
+                            }
+                        }
+                        5 -> {
+                            val sendBtn = findWhatsAppSendButton(root)
+                            if (sendBtn != null) {
+                                tapNodeOrParent(sendBtn)
+                                Log.i(TAG, "Successfully sent WhatsApp message to $recipientName via in-app search!")
+                                return
+                            }
+                        }
+                    }
+                }
+
+                attempts++
+                if (attempts < 25) {
+                    mainHandler.postDelayed(this, 350)
+                }
+            }
+        }, 500)
+    }
+
+    private fun findWhatsAppSearchButton(node: AccessibilityNodeInfo): AccessibilityNodeInfo? {
+        val desc = node.contentDescription?.toString()?.lowercase() ?: ""
+        val viewId = node.viewIdResourceName?.lowercase() ?: ""
+        val text = node.text?.toString()?.lowercase() ?: ""
+        if (desc == "search" || desc.startsWith("search") || desc == "தேடு" ||
+            text == "search" || viewId.endsWith(":id/search_icon") || viewId.endsWith(":id/menuitem_search")) {
+            if (node.isClickable || node.parent?.isClickable == true) return node
+        }
+        for (i in 0 until node.childCount) {
+            val child = node.getChild(i) ?: continue
+            val found = findWhatsAppSearchButton(child)
+            if (found != null) return found
+        }
+        return null
+    }
+
+    private fun findWhatsAppSearchInput(node: AccessibilityNodeInfo): AccessibilityNodeInfo? {
+        val viewId = node.viewIdResourceName?.lowercase() ?: ""
+        val className = node.className?.toString() ?: ""
+        if ((viewId.endsWith(":id/search_src_text") || viewId.endsWith(":id/search_input") || className.contains("EditText", ignoreCase = true)) &&
+            (node.isEditable || node.isFocused)) {
+            return node
+        }
+        for (i in 0 until node.childCount) {
+            val child = node.getChild(i) ?: continue
+            val found = findWhatsAppSearchInput(child)
+            if (found != null) return found
+        }
+        return null
+    }
+
+    private fun findWhatsAppSearchResultContact(node: AccessibilityNodeInfo, recipientName: String): AccessibilityNodeInfo? {
+        val text = node.text?.toString()?.lowercase() ?: ""
+        val desc = node.contentDescription?.toString()?.lowercase() ?: ""
+        val lowerTarget = recipientName.lowercase().trim()
+
+        if ((text.contains(lowerTarget) || desc.contains(lowerTarget)) &&
+            (node.isClickable || node.parent?.isClickable == true)) {
+            val viewId = node.viewIdResourceName?.lowercase() ?: ""
+            if (!viewId.contains("search_src_text")) {
+                return node
+            }
+        }
+        for (i in 0 until node.childCount) {
+            val child = node.getChild(i) ?: continue
+            val found = findWhatsAppSearchResultContact(child, recipientName)
+            if (found != null) return found
+        }
+        return null
+    }
+
+    private fun findWhatsAppMessageEntry(node: AccessibilityNodeInfo): AccessibilityNodeInfo? {
+        val viewId = node.viewIdResourceName?.lowercase() ?: ""
+        val className = node.className?.toString() ?: ""
+
+        if (viewId.endsWith(":id/entry") || viewId.endsWith(":id/compose_box") ||
+            (className.contains("EditText", ignoreCase = true) && !viewId.contains("search"))) {
+            return node
+        }
+        for (i in 0 until node.childCount) {
+            val child = node.getChild(i) ?: continue
+            val found = findWhatsAppMessageEntry(child)
+            if (found != null) return found
+        }
+        return null
     }
 
     private fun findWhatsAppSendButton(node: AccessibilityNodeInfo): AccessibilityNodeInfo? {

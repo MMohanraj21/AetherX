@@ -415,6 +415,10 @@ class GeminiLiveWebSocket(
                                         put("type", "BOOLEAN")
                                         put("description", "True if user already confirmed sending.")
                                     })
+                                    put("pin_password", JSONObject().apply {
+                                        put("type", "STRING")
+                                        put("description", "Optional PIN or privacy password to automatically unlock WhatsApp before sending.")
+                                    })
                                 })
                                 put("required", JSONArray().apply { put("recipient_name"); put("message") })
                             })
@@ -443,8 +447,28 @@ class GeminiLiveWebSocket(
                                         put("type", "BOOLEAN")
                                         put("description", "True if user already confirmed calling.")
                                     })
+                                    put("pin_password", JSONObject().apply {
+                                        put("type", "STRING")
+                                        put("description", "Optional PIN or privacy password to unlock WhatsApp.")
+                                    })
                                 })
                                 put("required", JSONArray().apply { put("recipient_name"); put("call_type") })
+                            })
+                        })
+
+                        // 9b. set_whatsapp_pin
+                        put(JSONObject().apply {
+                            put("name", "set_whatsapp_pin")
+                            put("description", "Saves or updates the user's WhatsApp privacy PIN/password so Zara can automatically unlock WhatsApp when sending messages or opening chats.")
+                            put("parameters", JSONObject().apply {
+                                put("type", "OBJECT")
+                                put("properties", JSONObject().apply {
+                                    put("pin", JSONObject().apply {
+                                        put("type", "STRING")
+                                        put("description", "The 4-digit, 6-digit PIN, or password for WhatsApp.")
+                                    })
+                                })
+                                put("required", JSONArray().apply { put("pin") })
                             })
                         })
 

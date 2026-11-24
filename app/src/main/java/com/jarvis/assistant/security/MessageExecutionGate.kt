@@ -118,8 +118,8 @@ object MessageExecutionGate {
 
         if (isConfirm) {
             draft.isAuthorized = true
-            _activeDraft.value = null // Single-use consumption
-            IntelligentConfirmationManager.markExecuted(draft.appType, draft.recipient, draft.exactContent)
+            // Keep draft active with short 30-second TTL so incoming tool execution can validate it
+            draft.expiresAt = System.currentTimeMillis() + 30_000L
             Log.i(TAG, "Draft [${draft.actionId}] explicitly AUTHORIZED by user.")
             return GateResult.Authorized(draft)
         }
@@ -174,6 +174,11 @@ object MessageExecutionGate {
     }
 
     fun cancelActiveDraft() {
+        _activeDraft.value = null
+        IntelligentConfirmationManager.clearPending()
+    }
+
+    fun consumeActiveDraft() {
         _activeDraft.value = null
         IntelligentConfirmationManager.clearPending()
     }

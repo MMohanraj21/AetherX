@@ -97,24 +97,24 @@ jobs:
         if: github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v5.6.1
-          name: "Zara AI Assistant v5.6.1 — Voice Engine Handshake & Audition Player Fix"
+          tag_name: v5.6.2
+          name: "Zara AI Assistant v5.6.2 — Zero Hallucination, WhatsApp Privacy Auto-Unlock & Tamil Auditions"
           body: |
-            ### Zara AI Assistant v5.6.1 (Release Build 561)
+            ### Zara AI Assistant v5.6.2 (Release Build 562)
             Founder & Lead Architect: Mohanraj (@Hexvora777).
 
-            ### Fixes & Enhancements in v5.6.1:
-            - **Native Voice Engine Handshake**:
-              - Fixed voice identifier mapping: `ZaraVoicePreferenceManager.getGeminiLiveVoiceName()` guarantees valid Gemini Live API voice identifiers (`Aoede`, `Kore`, `Leda`, `Zephyr` for female; `Fenrir`, `Orus`, `Charon`, `Puck` for male).
-              - Eliminated WebSocket setup rejection (1008/1007) so Gemini Live connects immediately without being muted or going offline.
-              - Model error resilience: auto-fallback from `gemini-3.8-live` to `models/gemini-2.0-flash` ensures real-time connection across all API keys.
-            - **100% Reliable Voice Audition Player**:
-              - Bundled 10 offline 24kHz audition audio assets in `assets/auditions/` ensuring preview sample playback ALWAYS plays smoothly.
-              - Fixed `GeminiRestClient.synthesizeSpeech` to target `gemini-2.0-flash` with mapped voice identifiers and automatic WAV container unwrap.
-            - **Synchronized Persona & Voice Studio Settings**:
-              - Completely removed legacy 5-radio group from `activity_persona.xml` and `PersonaActivity.kt`.
-              - Replaced with dynamic AI Voice Profile card and direct link to the 10-Voice Studio.
-              - Strict Gender Lock preserved everywhere across the application.
+            ### Fixes & Enhancements in v5.6.2:
+            - **Zero Hallucination / Zero Lying (Absolute Truthfulness)**:
+              - Completely eliminated premature `markExecuted()` bug in `MessageExecutionGate.kt` and `IntelligentConfirmationManager.kt`.
+              - Removed false success return from `send_whatsapp_message` idempotency filter; actions are only reported as completed when genuinely executed.
+              - Never argue or repeat false claims when challenged by the user: Zara immediately acknowledges and executes on screen.
+            - **WhatsApp Privacy PIN / Password Auto-Unlock**:
+              - Automated PIN & privacy password unlock via `JarvisAccessibilityService.kt` supporting password fields, Vivo OriginOS security keypad, and numeric digit button tapping.
+              - Added `set_whatsapp_pin` tool and `pin_password` parameter so user can provide or save their PIN.
+              - In-app WhatsApp search fallback: if contact is not in phone address book, Zara opens WhatsApp, searches in-app, selects contact, types message, and taps send.
+            - **Authentic Spoken Tamil Voice Auditions**:
+              - Replaced synthetic tone chirps with 10 authentic spoken Tamil speech MP3s in `app/src/main/assets/auditions/`.
+              - Upgraded `VoiceStudioActivity.kt` to play authentic spoken Tamil samples via `MediaPlayer`.
           files: |
             artifacts/Zara-release.apk
             artifacts/Zara-debug.apk

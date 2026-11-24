@@ -3,6 +3,7 @@ package com.jarvis.assistant.ui.voice
 import android.media.AudioAttributes
 import android.media.AudioFormat
 import android.media.AudioTrack
+import android.media.MediaPlayer
 import android.os.Bundle
 import android.util.Log
 import android.view.LayoutInflater
@@ -41,6 +42,7 @@ class VoiceStudioActivity : AppCompatActivity() {
 
     private var currentGenderTab = VoiceGender.FEMALE
     private var currentlyPlayingVoiceId: String? = null
+    private var activeMediaPlayer: MediaPlayer? = null
     private var activeAudioTrack: AudioTrack? = null
     private var auditionJob: Job? = null
     private lateinit var voiceAdapter: VoiceAdapter
@@ -155,7 +157,6 @@ class VoiceStudioActivity : AppCompatActivity() {
         if (currentlyPlayingVoiceId == profile.id) {
             // Already playing this voice -> stop
             stopAuditionPlayback()
-            voiceAdapter.notifyDataSetChanged()
             return
         }
 
@@ -163,59 +164,63 @@ class VoiceStudioActivity : AppCompatActivity() {
         currentlyPlayingVoiceId = profile.id
         voiceAdapter.notifyDataSetChanged()
 
+        // 1. First priority: Play authentic pre-recorded spoken Tamil MP3 audition asset
+        try {
+            val assetPath = "auditions/audition_${profile.id.lowercase()}.mp3"
+            val afd = assets.openFd(assetPath)
+            val player = MediaPlayer().apply {
+                setAudioAttributes(
+                    AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_MEDIA)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                        .build()
+                )
+                setDataSource(afd.fileDescriptor, afd.startOffset, afd.length)
+                afd.close()
+                setOnCompletionListener {
+                    stopAuditionPlayback()
+                }
+                setOnErrorListener { _, what, extra ->
+                    Log.w(TAG, "MediaPlayer error: what=$what, extra=$extra")
+                    stopAuditionPlayback()
+                    true
+                }
+                prepare()
+                start()
+            }
+            activeMediaPlayer = player
+            return
+        } catch (e: Exception) {
+            Log.w(TAG, "Bundled MP3 audition not found or failed for ${profile.id}: ${e.message}. Falling back to live synthesis.")
+        }
+
+        // 2. Fallback: Live synthesis via Gemini or PCM cache
         auditionJob = lifecycleScope.launch {
-            playVoiceAudition(profile)
+            playVoiceAuditionLiveFallback(profile)
         }
     }
 
-    private suspend fun playVoiceAudition(profile: VoiceProfile) {
+    private suspend fun playVoiceAuditionLiveFallback(profile: VoiceProfile) {
         val apiKey = preferences.apiKey
         val cacheFile = File(cacheDir, "audition_${profile.id.lowercase()}.pcm")
 
         val audioBytes: ByteArray? = withContext(Dispatchers.IO) {
-            // 1. Check local cache first
             if (cacheFile.exists() && cacheFile.length() > 0) {
-                try {
-                    cacheFile.readBytes()
-                } catch (e: Exception) {
-                    null
-                }
-            } else {
-                var generatedBytes: ByteArray? = null
-                // 2. Try live Gemini neural audio generation if API key is present
-                if (apiKey.isNotBlank()) {
-                    val sampleText = profile.sampleTamilText
-                    val result = GeminiRestClient.synthesizeSpeech(
-                        apiKey = apiKey,
-                        voiceName = profile.id,
-                        text = sampleText
-                    )
-                    if (result.isSuccess) {
-                        val bytes = result.getOrNull()
-                        if (bytes != null && bytes.isNotEmpty()) {
-                            try {
-                                cacheFile.writeBytes(bytes)
-                            } catch (_: Exception) {}
-                            generatedBytes = bytes
-                        }
-                    } else {
-                        Log.w(TAG, "Gemini speech synthesis failed: ${result.exceptionOrNull()?.message}")
-                    }
-                }
-
-                // 3. If live generation was unavailable or failed, load bundled offline audition asset
-                if (generatedBytes == null || generatedBytes.isEmpty()) {
-                    try {
-                        val assetPath = "auditions/audition_${profile.id.lowercase()}.pcm"
-                        assets.open(assetPath).use { it.readBytes() }
-                    } catch (e: Exception) {
-                        Log.e(TAG, "Failed to load bundled audition asset: ${e.message}")
-                        null
-                    }
-                } else {
-                    generatedBytes
-                }
-            }
+                try { cacheFile.readBytes() } catch (e: Exception) { null }
+            } else if (apiKey.isNotBlank()) {
+                val result = GeminiRestClient.synthesizeSpeech(
+                    apiKey = apiKey,
+                    voiceName = profile.id,
+                    text = profile.sampleTamilText
+                )
+                if (result.isSuccess) {
+                    val bytes = result.getOrNull()
+                    if (bytes != null && bytes.isNotEmpty()) {
+                        try { cacheFile.writeBytes(bytes) } catch (_: Exception) {}
+                        bytes
+                    } else null
+                } else null
+            } else null
         }
 
         if (audioBytes == null || audioBytes.isEmpty()) {
@@ -224,18 +229,15 @@ class VoiceStudioActivity : AppCompatActivity() {
                 "Audition sample unavailable. Please try again.",
                 Toast.LENGTH_SHORT
             ).show()
-            currentlyPlayingVoiceId = null
-            voiceAdapter.notifyDataSetChanged()
+            stopAuditionPlayback()
             return
         }
 
-        // Play the 24kHz 16-bit PCM bytes
         playRawPcm(audioBytes, profile.id)
     }
 
     private suspend fun playRawPcm(rawBytes: ByteArray, voiceId: String) = withContext(Dispatchers.IO) {
         try {
-            // Strip WAV RIFF header if present
             val pcmBytes = if (rawBytes.size > 44 &&
                 rawBytes[0] == 'R'.code.toByte() &&
                 rawBytes[1] == 'I'.code.toByte() &&
@@ -275,7 +277,6 @@ class VoiceStudioActivity : AppCompatActivity() {
             activeAudioTrack = track
             track.play()
 
-            // Write PCM in chunks
             val chunkSize = 4096
             var offset = 0
             while (offset < pcmBytes.size && currentlyPlayingVoiceId == voiceId) {
@@ -284,7 +285,6 @@ class VoiceStudioActivity : AppCompatActivity() {
                 offset += bytesToWrite
             }
 
-            // Small delay to let final buffer drain
             kotlinx.coroutines.delay(300)
             track.stop()
             track.release()
@@ -294,8 +294,7 @@ class VoiceStudioActivity : AppCompatActivity() {
             activeAudioTrack = null
             withContext(Dispatchers.Main) {
                 if (currentlyPlayingVoiceId == voiceId) {
-                    currentlyPlayingVoiceId = null
-                    voiceAdapter.notifyDataSetChanged()
+                    stopAuditionPlayback()
                 }
             }
         }
@@ -304,12 +303,21 @@ class VoiceStudioActivity : AppCompatActivity() {
     private fun stopAuditionPlayback() {
         auditionJob?.cancel()
         auditionJob = null
+        val hadPlaying = currentlyPlayingVoiceId != null
         currentlyPlayingVoiceId = null
+        try {
+            activeMediaPlayer?.stop()
+            activeMediaPlayer?.release()
+        } catch (_: Exception) {}
+        activeMediaPlayer = null
         try {
             activeAudioTrack?.stop()
             activeAudioTrack?.release()
         } catch (_: Exception) {}
         activeAudioTrack = null
+        if (hadPlaying) {
+            voiceAdapter.notifyDataSetChanged()
+        }
     }
 
     private inner class VoiceAdapter(

@@ -197,7 +197,6 @@ object IntelligentConfirmationManager {
 
         if (isConfirm) {
             action.status = ConfirmationStatus.AUTHORIZED
-            markExecuted(action.actionType, action.recipient, action.content)
             Log.i(TAG, "Action [${action.actionId}] AUTHORIZED by user speech: '$userSpeech'")
             return ConfirmationResult.Authorized(action)
         }

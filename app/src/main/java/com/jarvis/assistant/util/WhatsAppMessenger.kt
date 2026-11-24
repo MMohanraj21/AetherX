@@ -34,20 +34,69 @@ object WhatsAppMessenger {
 
     /**
      * Attempts to send a WhatsApp message to [recipientName].
+     * Supports PIN auto-unlock and fallback to in-app search if contact is not in phone contacts.
      */
     fun sendMessage(
         context: Context,
         recipientName: String,
         message: String,
         appNumber: Int? = null,
-        confirmed: Boolean = false
+        confirmed: Boolean = false,
+        pin: String? = null
     ): SendResult {
-        if (!ContactCaller.hasContactsPermission(context)) return SendResult.MissingPermission
-        // 1. Resolve contact
-        val matches = ContactCaller.findMatches(context, recipientName)
-        if (matches.isEmpty()) {
-            return SendResult.ContactNotFound(recipientName)
+        // 1. Resolve contact from system contacts if permission is available
+        val matches = if (ContactCaller.hasContactsPermission(context)) {
+            ContactCaller.findMatches(context, recipientName)
+        } else {
+            emptyList()
         }
+
+        val appMatches = AppLauncher.findMatchingApps(context, "WhatsApp")
+        val isDual = appMatches.size >= 2 || (appMatches.isNotEmpty() && AppLauncher.isDualAppEnabled(context, appMatches[0].packageName))
+        val targetIndex = (appNumber ?: 1) - 1
+        val targetApp = if (appMatches.isNotEmpty() && targetIndex in appMatches.indices) {
+            appMatches[targetIndex]
+        } else {
+            appMatches.firstOrNull()
+        }
+        val chosenPackage = targetApp?.packageName ?: if (appNumber == 2) "com.whatsapp.w4b" else "com.whatsapp"
+        val targetAppName = targetApp?.label ?: if (chosenPackage.contains("w4b")) "WhatsApp Business" else "WhatsApp"
+
+        // Fallback: If contact not in system address book, open WhatsApp directly and search in-app
+        if (matches.isEmpty()) {
+            if (isDual && appNumber == null) {
+                return SendResult.MultipleAppsFound(recipientName, if (appMatches.size >= 2) appMatches.size else 2)
+            }
+            if (!confirmed) {
+                return SendResult.RequiresConfirmation(recipientName, "In-App Search", message)
+            }
+
+            val launchIntent = context.packageManager.getLaunchIntentForPackage(chosenPackage)
+                ?: Intent(Intent.ACTION_MAIN).apply {
+                    addCategory(Intent.CATEGORY_LAUNCHER)
+                    setPackage(chosenPackage)
+                }
+            launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+
+            if ((appNumber ?: 1) == 2 || (targetApp != null && targetApp.isDualOrWorkProfile)) {
+                launchIntent.putExtra("multi_user_id", 999)
+                launchIntent.putExtra("userId", 999)
+                launchIntent.putExtra("clone_id", 1)
+                launchIntent.putExtra("vivo_clone_id", 1)
+                launchIntent.putExtra("is_clone_app", true)
+                launchIntent.putExtra("is_clone", true)
+                launchIntent.putExtra("clone_app", true)
+            }
+
+            return try {
+                ActivityLauncherHelper.startActivitySafely(context, launchIntent)
+                JarvisAccessibilityService.instance?.scheduleWhatsAppSearchAndSend(recipientName, message, pin)
+                SendResult.Success(recipientName, "In-App Search", targetAppName)
+            } catch (e: Exception) {
+                SendResult.Error("Could not launch WhatsApp: ${e.message}")
+            }
+        }
+
         if (matches.size > 1) {
             val exactMatch = matches.firstOrNull { it.name.equals(recipientName.trim(), ignoreCase = true) }
             if (exactMatch == null) {
@@ -70,9 +119,6 @@ object WhatsAppMessenger {
         }
 
         // 2. Check WhatsApp dual app availability
-        val appMatches = AppLauncher.findMatchingApps(context, "WhatsApp")
-        val isDual = appMatches.size >= 2 || (appMatches.isNotEmpty() && AppLauncher.isDualAppEnabled(context, appMatches[0].packageName))
-
         if (isDual && appNumber == null) {
             return SendResult.MultipleAppsFound(targetContact.name, if (appMatches.size >= 2) appMatches.size else 2)
         }
@@ -88,15 +134,6 @@ object WhatsAppMessenger {
         val intent = Intent(Intent.ACTION_VIEW, Uri.parse(deepLinkUrl)).apply {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
         }
-
-        val targetIndex = (appNumber ?: 1) - 1
-        val targetApp = if (appMatches.isNotEmpty() && targetIndex in appMatches.indices) {
-            appMatches[targetIndex]
-        } else {
-            appMatches.firstOrNull()
-        }
-
-        val chosenPackage = targetApp?.packageName ?: if (appNumber == 2) "com.whatsapp.w4b" else "com.whatsapp"
         intent.setPackage(chosenPackage)
 
         if ((appNumber ?: 1) == 2 || (targetApp != null && targetApp.isDualOrWorkProfile)) {
@@ -111,8 +148,7 @@ object WhatsAppMessenger {
 
         return try {
             ActivityLauncherHelper.startActivitySafely(context, intent)
-            JarvisAccessibilityService.instance?.scheduleWhatsAppAutoSend()
-            val targetAppName = targetApp?.label ?: if (chosenPackage.contains("w4b")) "WhatsApp Business" else "WhatsApp"
+            JarvisAccessibilityService.instance?.scheduleWhatsAppAutoSend(pin)
             SendResult.Success(targetContact.name, phoneDigits, targetAppName)
         } catch (e: Exception) {
             try {
@@ -120,7 +156,7 @@ object WhatsAppMessenger {
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
                 }
                 ActivityLauncherHelper.startActivitySafely(context, fallbackIntent)
-                JarvisAccessibilityService.instance?.scheduleWhatsAppAutoSend()
+                JarvisAccessibilityService.instance?.scheduleWhatsAppAutoSend(pin)
                 SendResult.Success(targetContact.name, phoneDigits, "WhatsApp")
             } catch (e2: Exception) {
                 SendResult.Error("Could not launch WhatsApp. Is WhatsApp installed on your device?")
@@ -137,7 +173,8 @@ object WhatsAppMessenger {
         recipientName: String,
         callType: String = "voice", // "voice" or "video"
         appNumber: Int? = null,
-        confirmed: Boolean = false
+        confirmed: Boolean = false,
+        pin: String? = null
     ): CallResult {
         if (!ContactCaller.hasContactsPermission(context)) return CallResult.MissingPermission
         // 1. Resolve contact

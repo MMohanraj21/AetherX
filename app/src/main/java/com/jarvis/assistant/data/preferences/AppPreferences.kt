@@ -82,7 +82,12 @@ class AppPreferences(context: Context) {
         private const val KEY_ISLAND_ENABLED = "key_island_enabled"
         private const val KEY_ISLAND_MUSIC_ENABLED = "key_island_music_enabled"
         private const val KEY_ISLAND_NOTIFICATIONS_ENABLED = "key_island_notifications_enabled"
+        private const val KEY_WHATSAPP_PIN = "key_whatsapp_pin"
     }
+
+    var whatsappPin: String
+        get() = prefs.getString(KEY_WHATSAPP_PIN, "") ?: ""
+        set(value) = prefs.edit().putString(KEY_WHATSAPP_PIN, value.trim()).apply()
 
     var isIslandEnabled: Boolean
         get() = prefs.getBoolean(KEY_ISLAND_ENABLED, true)

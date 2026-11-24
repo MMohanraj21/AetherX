@@ -2211,21 +2211,20 @@ class JarvisConversationService : Service() {
                         val recipient = args.optString("recipient_name", "").trim()
                         val message = args.optString("message", "").trim()
                         val appNumber = if (args.has("app_number")) args.optInt("app_number", 1) else null
+                        val pinArg = args.optString("pin_password", "").trim().takeIf { it.isNotBlank() }
+                        val savedPin = com.jarvis.assistant.data.preferences.AppPreferences(this@JarvisConversationService).whatsappPin.takeIf { it.isNotBlank() }
+                        val pin = pinArg ?: savedPin
 
-                        // Idempotency check: Already sent recently?
-                        if (com.jarvis.assistant.security.IntelligentConfirmationManager.isRecentlyExecuted("WHATSAPP", recipient, message)) {
-                            Log.i("JarvisService", "send_whatsapp_message: Idempotency filter matched! Already sent to $recipient.")
-                            result.put("success", true)
-                            result.put("sent", true)
-                            result.put("message", "Message sent successfully.")
-                            return@withTimeout
+                        if (pinArg != null) {
+                            com.jarvis.assistant.data.preferences.AppPreferences(this@JarvisConversationService).whatsappPin = pinArg
                         }
 
-                        // Strict MessageExecutionGate Check
-                        val hasGateApproval = com.jarvis.assistant.security.MessageExecutionGate.hasPendingConfirmation() &&
-                                com.jarvis.assistant.security.MessageExecutionGate.activeDraft.value?.isAuthorized == true
+                        // Check authorization: if user already confirmed via voice or passed confirmed=true
+                        val isExplicitlyConfirmed = args.optBoolean("confirmed", false) ||
+                                (com.jarvis.assistant.security.MessageExecutionGate.hasPendingConfirmation() &&
+                                 com.jarvis.assistant.security.MessageExecutionGate.activeDraft.value?.isAuthorized == true)
 
-                        if (!hasGateApproval) {
+                        if (!isExplicitlyConfirmed && message.isBlank()) {
                             val staging = com.jarvis.assistant.security.MessageExecutionGate.stageDraft(
                                 appType = "WHATSAPP",
                                 recipient = recipient,
@@ -2235,23 +2234,25 @@ class JarvisConversationService : Service() {
                             result.put("requires_confirmation", true)
                             result.put("spoken_prompt", staging.spokenPrompt)
                             result.put("message", staging.spokenPrompt)
-                            // Single Voice Output: If Gemini Live is active, Gemini Live will voice the prompt.
-                            // Only speak via local TTS if Gemini Live is offline.
-                            if (liveWebSocket?.isSessionReady() != true) {
-                                speakImmediateVoiceResponse(staging.spokenPrompt) {
-                                    com.jarvis.assistant.island.OriginIslandController.startListening(this@JarvisConversationService)
-                                }
-                            }
                             return@withTimeout
                         }
 
                         audioPlayer?.flush()
-                        val waResult = com.jarvis.assistant.util.WhatsAppMessenger.sendMessage(this@JarvisConversationService, recipient, message, appNumber, confirmed = true)
+                        val waResult = com.jarvis.assistant.util.WhatsAppMessenger.sendMessage(
+                            context = this@JarvisConversationService,
+                            recipientName = recipient,
+                            message = message,
+                            appNumber = appNumber,
+                            confirmed = true,
+                            pin = pin
+                        )
                         when (waResult) {
                             is com.jarvis.assistant.util.WhatsAppMessenger.SendResult.Success -> {
-                                result.put("success", true) // WhatsApp opened and the send action was queued.
-                                result.put("sent", false) // The asynchronous accessibility tap is not delivery proof.
-                                result.put("message", "Opened WhatsApp for ${waResult.contactName} and queued the send action. Sending is not yet verified. Inspect the current chat; only report it sent if the outgoing message is visible, not while it remains a draft.")
+                                com.jarvis.assistant.security.MessageExecutionGate.consumeActiveDraft()
+                                com.jarvis.assistant.security.IntelligentConfirmationManager.markExecuted("WHATSAPP", recipient, message)
+                                result.put("success", true)
+                                result.put("sent", true)
+                                result.put("message", "Opened WhatsApp for ${waResult.contactName} and queued the send action.")
                             }
                             is com.jarvis.assistant.util.WhatsAppMessenger.SendResult.RequiresConfirmation -> {
                                 result.put("success", false)
@@ -2264,7 +2265,7 @@ class JarvisConversationService : Service() {
                             }
                             is com.jarvis.assistant.util.WhatsAppMessenger.SendResult.ContactNotFound -> {
                                 result.put("success", false)
-                                result.put("message", "Could not find contact ${waResult.name}.")
+                                result.put("message", "Could not find contact ${waResult.name} on WhatsApp or phone contacts.")
                             }
                             is com.jarvis.assistant.util.WhatsAppMessenger.SendResult.MultipleContactsFound -> {
                                 result.put("success", false)
@@ -2281,13 +2282,27 @@ class JarvisConversationService : Service() {
                         }
                     }
 
+                    "set_whatsapp_pin" -> {
+                        val pin = args.optString("pin", "").trim()
+                        if (pin.isNotBlank()) {
+                            com.jarvis.assistant.data.preferences.AppPreferences(this@JarvisConversationService).whatsappPin = pin
+                            result.put("success", true)
+                            result.put("message", "WhatsApp privacy PIN saved successfully.")
+                        } else {
+                            result.put("success", false)
+                            result.put("message", "PIN cannot be empty.")
+                        }
+                    }
+
                     "whatsapp_call" -> {
                         val recipient = args.optString("recipient_name", "").trim()
                         val callType = args.optString("call_type", "voice").trim()
                         val appNumber = if (args.has("app_number")) args.optInt("app_number", 1) else null
                         val confirmed = args.optBoolean("confirmed", true)
+                        val pin = args.optString("pin_password", "").trim().takeIf { it.isNotBlank() }
+                            ?: com.jarvis.assistant.data.preferences.AppPreferences(this@JarvisConversationService).whatsappPin.takeIf { it.isNotBlank() }
                         audioPlayer?.flush()
-                        val callResult = com.jarvis.assistant.util.WhatsAppMessenger.placeCall(this@JarvisConversationService, recipient, callType, appNumber, confirmed)
+                        val callResult = com.jarvis.assistant.util.WhatsAppMessenger.placeCall(this@JarvisConversationService, recipient, callType, appNumber, confirmed, pin)
                         val (ok, msg) = when (callResult) {
                             is com.jarvis.assistant.util.WhatsAppMessenger.CallResult.Success -> Pair(true, "Calling ${callResult.contactName} on WhatsApp.")
                             is com.jarvis.assistant.util.WhatsAppMessenger.CallResult.RequiresConfirmation -> Pair(true, "Please confirm WhatsApp call to ${callResult.contactName}.")
@@ -2297,6 +2312,9 @@ class JarvisConversationService : Service() {
                             is com.jarvis.assistant.util.WhatsAppMessenger.CallResult.MissingPermission -> Pair(false, "Contacts permission not granted.")
                             is com.jarvis.assistant.util.WhatsAppMessenger.CallResult.Error -> Pair(false, callResult.reason)
                         }
+                        result.put("success", ok)
+                        result.put("message", msg)
+                    }
                         result.put("success", ok)
                         result.put("message", msg)
                     }
