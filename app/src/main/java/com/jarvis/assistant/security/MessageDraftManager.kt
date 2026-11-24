@@ -13,7 +13,7 @@ data class PendingMessageDraft(
     val exactContent: String,
     val authToken: String = "AUTH_" + UUID.randomUUID().toString().take(8),
     val createdAt: Long = System.currentTimeMillis(),
-    val expiresAt: Long = System.currentTimeMillis() + 60_000L, // 60-second validity
+    var expiresAt: Long = System.currentTimeMillis() + 60_000L, // 60-second validity
     var isAuthorized: Boolean = false,
     val replyAction: Any? = null
 )
