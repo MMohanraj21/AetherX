@@ -116,13 +116,13 @@ object GeminiRestClient {
 
     /**
      * Synthesizes speech using Gemini's native neural audio generation.
-     * Returns decoded raw audio bytes (PCM/WAV).
+     * Returns decoded raw 24kHz 16-bit PCM bytes (stripping any WAV container headers).
      */
     suspend fun synthesizeSpeech(
         apiKey: String,
         voiceName: String,
         text: String,
-        model: String = "gemini-2.5-flash"
+        model: String = "gemini-2.0-flash"
     ): Result<ByteArray> = withContext(Dispatchers.IO) {
         if (apiKey.isBlank()) {
             return@withContext Result.failure(IllegalArgumentException("Gemini API key is missing"))
@@ -133,10 +133,12 @@ object GeminiRestClient {
 
         try {
             val cleanModel = if (model.startsWith("models/")) model.removePrefix("models/") else model
-            val targetModel = when (cleanModel) {
-                "gemini-3.8-live", "gemini-3.1-flash-live-preview" -> "gemini-2.5-flash"
-                else -> cleanModel.ifBlank { "gemini-2.5-flash" }
+            val targetModel = when {
+                cleanModel.contains("2.0-flash") -> cleanModel
+                cleanModel.contains("3.8-flash-tts") -> cleanModel
+                else -> "gemini-2.0-flash"
             }
+            val liveVoice = com.jarvis.assistant.audio.ZaraVoicePreferenceManager.getGeminiLiveVoiceName(voiceName)
             val url = "$BASE_URL/$targetModel:generateContent?key=$apiKey"
 
             val jsonBody = JSONObject().apply {
@@ -145,7 +147,7 @@ object GeminiRestClient {
                         put("role", "user")
                         put("parts", JSONArray().apply {
                             put(JSONObject().apply {
-                                put("text", "Read this text aloud with warm human emotion, accurate pronunciation, and natural conversational cadence. Output only audio:\n$text")
+                                put("text", "Read this text aloud in Tamil (ta-IN) with warm, natural, human conversational emotion. Output only audio:\n$text")
                             })
                         })
                     })
@@ -157,7 +159,7 @@ object GeminiRestClient {
                     put("speechConfig", JSONObject().apply {
                         put("voiceConfig", JSONObject().apply {
                             put("prebuiltVoiceConfig", JSONObject().apply {
-                                put("voiceName", voiceName)
+                                put("voiceName", liveVoice)
                             })
                         })
                     })
@@ -192,7 +194,18 @@ object GeminiRestClient {
                                 val base64Data = inlineData.optString("data")
                                 if (base64Data.isNotBlank()) {
                                     val decoded = android.util.Base64.decode(base64Data, android.util.Base64.DEFAULT)
-                                    return@withContext Result.success(decoded)
+                                    // If wrapped in WAV container (RIFF header), strip 44 bytes to obtain clean PCM
+                                    val pcmBytes = if (decoded.size > 44 &&
+                                        decoded[0] == 'R'.code.toByte() &&
+                                        decoded[1] == 'I'.code.toByte() &&
+                                        decoded[2] == 'F'.code.toByte() &&
+                                        decoded[3] == 'F'.code.toByte()
+                                    ) {
+                                        decoded.copyOfRange(44, decoded.size)
+                                    } else {
+                                        decoded
+                                    }
+                                    return@withContext Result.success(pcmBytes)
                                 }
                             }
                         }

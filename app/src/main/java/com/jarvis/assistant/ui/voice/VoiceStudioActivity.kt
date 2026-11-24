@@ -170,53 +170,60 @@ class VoiceStudioActivity : AppCompatActivity() {
 
     private suspend fun playVoiceAudition(profile: VoiceProfile) {
         val apiKey = preferences.apiKey
-        val cacheFile = File(cacheDir, "audition_${profile.id}.pcm")
+        val cacheFile = File(cacheDir, "audition_${profile.id.lowercase()}.pcm")
 
         val audioBytes: ByteArray? = withContext(Dispatchers.IO) {
+            // 1. Check local cache first
             if (cacheFile.exists() && cacheFile.length() > 0) {
                 try {
                     cacheFile.readBytes()
                 } catch (e: Exception) {
                     null
                 }
-            } else if (apiKey.isNotBlank()) {
-                val sampleText = profile.sampleTamilText
-                val result = GeminiRestClient.synthesizeSpeech(
-                    apiKey = apiKey,
-                    voiceName = profile.id,
-                    text = sampleText
-                )
-                if (result.isSuccess) {
-                    val bytes = result.getOrNull()
-                    if (bytes != null && bytes.isNotEmpty()) {
-                        try {
-                            cacheFile.writeBytes(bytes)
-                        } catch (_: Exception) {}
-                        bytes
-                    } else null
-                } else {
-                    Log.w(TAG, "Gemini speech synthesis failed: ${result.exceptionOrNull()?.message}")
-                    null
-                }
             } else {
-                null
+                var generatedBytes: ByteArray? = null
+                // 2. Try live Gemini neural audio generation if API key is present
+                if (apiKey.isNotBlank()) {
+                    val sampleText = profile.sampleTamilText
+                    val result = GeminiRestClient.synthesizeSpeech(
+                        apiKey = apiKey,
+                        voiceName = profile.id,
+                        text = sampleText
+                    )
+                    if (result.isSuccess) {
+                        val bytes = result.getOrNull()
+                        if (bytes != null && bytes.isNotEmpty()) {
+                            try {
+                                cacheFile.writeBytes(bytes)
+                            } catch (_: Exception) {}
+                            generatedBytes = bytes
+                        }
+                    } else {
+                        Log.w(TAG, "Gemini speech synthesis failed: ${result.exceptionOrNull()?.message}")
+                    }
+                }
+
+                // 3. If live generation was unavailable or failed, load bundled offline audition asset
+                if (generatedBytes == null || generatedBytes.isEmpty()) {
+                    try {
+                        val assetPath = "auditions/audition_${profile.id.lowercase()}.pcm"
+                        assets.open(assetPath).use { it.readBytes() }
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Failed to load bundled audition asset: ${e.message}")
+                        null
+                    }
+                } else {
+                    generatedBytes
+                }
             }
         }
 
         if (audioBytes == null || audioBytes.isEmpty()) {
-            if (apiKey.isBlank()) {
-                Toast.makeText(
-                    this@VoiceStudioActivity,
-                    "Gemini API Key is required in Settings for live neural audio generation.",
-                    Toast.LENGTH_LONG
-                ).show()
-            } else {
-                Toast.makeText(
-                    this@VoiceStudioActivity,
-                    "Audition sample generation failed. Check network connection.",
-                    Toast.LENGTH_SHORT
-                ).show()
-            }
+            Toast.makeText(
+                this@VoiceStudioActivity,
+                "Audition sample unavailable. Please try again.",
+                Toast.LENGTH_SHORT
+            ).show()
             currentlyPlayingVoiceId = null
             voiceAdapter.notifyDataSetChanged()
             return
@@ -226,8 +233,20 @@ class VoiceStudioActivity : AppCompatActivity() {
         playRawPcm(audioBytes, profile.id)
     }
 
-    private suspend fun playRawPcm(pcmBytes: ByteArray, voiceId: String) = withContext(Dispatchers.IO) {
+    private suspend fun playRawPcm(rawBytes: ByteArray, voiceId: String) = withContext(Dispatchers.IO) {
         try {
+            // Strip WAV RIFF header if present
+            val pcmBytes = if (rawBytes.size > 44 &&
+                rawBytes[0] == 'R'.code.toByte() &&
+                rawBytes[1] == 'I'.code.toByte() &&
+                rawBytes[2] == 'F'.code.toByte() &&
+                rawBytes[3] == 'F'.code.toByte()
+            ) {
+                rawBytes.copyOfRange(44, rawBytes.size)
+            } else {
+                rawBytes
+            }
+
             val minBufferSize = AudioTrack.getMinBufferSize(
                 SAMPLE_RATE,
                 AudioFormat.CHANNEL_OUT_MONO,

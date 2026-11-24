@@ -577,89 +577,112 @@
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
-            <RadioGroup
-                android:id="@+id/rgVoiceGroup"
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/cardActiveVoiceProfile"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:background="@drawable/bg_jarvis_card"
-                android:padding="14dp"
-                android:layout_marginBottom="24dp">
+                android:layout_marginBottom="12dp"
+                app:cardCornerRadius="14dp"
+                app:cardElevation="0dp"
+                app:strokeWidth="1dp"
+                app:strokeColor="@color/studio_card_active_border"
+                app:cardBackgroundColor="@color/studio_card_bg"
+                android:clickable="true"
+                android:focusable="true">
 
-                <RadioButton
-                    android:id="@+id/rbVoiceAoede"
+                <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="Aoede (Warm, expressive female voice)"
-                    android:textColor="?attr/themeTextPrimary"
-                    android:textSize="13sp"
-                    android:fontFamily="sans-serif-medium"
-                    android:paddingTop="6dp"
-                    android:paddingBottom="6dp" />
+                    android:orientation="vertical"
+                    android:padding="16dp">
 
-                <View
-                    android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:background="@color/border_subtle" />
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical">
 
-                <RadioButton
-                    android:id="@+id/rbVoiceKore"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="Kore (Gentle, calm female voice)"
-                    android:textColor="?attr/themeTextPrimary"
-                    android:textSize="13sp"
-                    android:fontFamily="sans-serif-medium"
-                    android:paddingTop="6dp"
-                    android:paddingBottom="6dp" />
+                        <ImageView
+                            android:layout_width="28dp"
+                            android:layout_height="28dp"
+                            android:src="@drawable/ic_voice_waveform"
+                            app:tint="@color/studio_purple_bright" />
 
-                <View
-                    android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:background="@color/border_subtle" />
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:orientation="vertical"
+                            android:layout_marginStart="12dp">
 
-                <RadioButton
-                    android:id="@+id/rbVoiceFenrir"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="Fenrir (Deep, protective charismatic male voice)"
-                    android:textColor="?attr/themeTextPrimary"
-                    android:textSize="13sp"
-                    android:fontFamily="sans-serif-medium"
-                    android:paddingTop="6dp"
-                    android:paddingBottom="6dp" />
+                            <TextView
+                                android:id="@+id/tvActiveVoiceName"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="Sulafat"
+                                android:textColor="@color/studio_text_primary"
+                                android:textSize="16sp"
+                                android:fontFamily="sans-serif-medium"
+                                android:textStyle="bold" />
 
-                <View
-                    android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:background="@color/border_subtle" />
+                            <TextView
+                                android:id="@+id/tvActiveVoiceDesc"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="Warm, sweet &amp; pleasant • Female AI Voice"
+                                android:textColor="@color/studio_text_secondary"
+                                android:textSize="12sp"
+                                android:fontFamily="sans-serif" />
+                        </LinearLayout>
 
-                <RadioButton
-                    android:id="@+id/rbVoicePuck"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="Puck (Crisp, modern dynamic male voice)"
-                    android:textColor="?attr/themeTextPrimary"
-                    android:textSize="13sp"
-                    android:fontFamily="sans-serif-medium"
-                    android:paddingTop="6dp"
-                    android:paddingBottom="6dp" />
+                        <TextView
+                            android:id="@+id/tvVoiceGenderBadge"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="LOCKED"
+                            android:textColor="@color/studio_purple_bright"
+                            android:textSize="10sp"
+                            android:background="@drawable/bg_pill_accent"
+                            android:paddingStart="8dp"
+                            android:paddingEnd="8dp"
+                            android:paddingTop="3dp"
+                            android:paddingBottom="3dp"
+                            android:fontFamily="sans-serif-medium" />
+                    </LinearLayout>
 
-                <View
-                    android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:background="@color/border_subtle" />
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="1dp"
+                        android:layout_marginTop="12dp"
+                        android:layout_marginBottom="12dp"
+                        android:background="@color/studio_card_border" />
 
-                <RadioButton
-                    android:id="@+id/rbVoiceCharon"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="Charon (Distinguished butler male voice)"
-                    android:textColor="?attr/themeTextPrimary"
-                    android:textSize="13sp"
-                    android:fontFamily="sans-serif-medium"
-                    android:paddingTop="6dp"
-                    android:paddingBottom="6dp" />
-            </RadioGroup>
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="10 Human-Like Tamil AI Voices (5 Female, 5 Male). Strict Gender Lock active."
+                        android:textColor="@color/studio_text_secondary"
+                        android:textSize="11sp"
+                        android:fontFamily="sans-serif" />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnOpenVoiceStudioFull"
+                android:layout_width="match_parent"
+                android:layout_height="50dp"
+                android:layout_marginBottom="24dp"
+                app:cornerRadius="12dp"
+                android:backgroundTint="@color/studio_card_bg"
+                app:strokeColor="@color/studio_purple_accent"
+                app:strokeWidth="1dp"
+                android:text="Open Zara Voice Studio (10 Tamil Voices)"
+                android:textColor="@color/studio_purple_bright"
+                android:textSize="13sp"
+                android:fontFamily="sans-serif-medium"
+                android:textAllCaps="false"
+                app:icon="@drawable/ic_sound_play"
+                app:iconTint="@color/studio_purple_bright" />
 
         </LinearLayout>
     </ScrollView>

@@ -870,7 +870,7 @@ class JarvisConversationService : Service() {
                 liveWebSocket = GeminiLiveWebSocket(
                     apiKey = apiKey,
                     model = preferences.aiModel,
-                    voiceName = com.jarvis.assistant.audio.ZaraVoicePreferenceManager.getGeminiVoiceName(this@JarvisConversationService),
+                    voiceName = com.jarvis.assistant.audio.ZaraVoicePreferenceManager.getLiveApiVoiceName(this@JarvisConversationService),
                     systemPrompt = systemPrompt,
                     listener = object : GeminiLiveWebSocket.Listener {
                         override fun onConnectionStateChanged(status: String) {

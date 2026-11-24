@@ -101,10 +101,10 @@ class SettingsFragment : Fragment() {
 
         // Persona & Voice
         val currentPersona = preferences.personality
-        val currentVoice = preferences.voice
-        binding.tvCurrentPersona.text = "$currentPersona • Voice: $currentVoice"
+        val voiceProfile = com.jarvis.assistant.audio.ZaraVoicePreferenceManager.getSelectedVoiceProfile(requireContext())
+        binding.tvCurrentPersona.text = "$currentPersona • Voice: ${voiceProfile.displayName}"
         binding.tvProfilePersonaChip.text = currentPersona.uppercase()
-        binding.tvVoiceStudioSubtitle.text = "Active Voice: $currentVoice • Strict Lock Active"
+        binding.tvVoiceStudioSubtitle.text = "${voiceProfile.displayName} (${voiceProfile.gender.name}) • Strict Gender Lock Active"
 
         // Silent Execution Mode
         binding.switchSilentMode.isChecked = preferences.isSilentExecutionMode

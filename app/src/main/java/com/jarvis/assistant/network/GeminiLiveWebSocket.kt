@@ -135,11 +135,18 @@ class GeminiLiveWebSocket(
                     if (code == 1008) {
                         val isModelError = reason.contains("BidiGenerateContent", ignoreCase = true) ||
                                            reason.contains("not found", ignoreCase = true) ||
-                                           reason.contains("not supported", ignoreCase = true)
+                                           reason.contains("not supported", ignoreCase = true) ||
+                                           reason.contains("model", ignoreCase = true)
                         if (isModelError) {
-                            if (activeModel != GeminiConstants.MODEL_3_8_LIVE) {
-                                Log.w(TAG, "Model $activeModel rejected by Gemini ($reason). Auto-falling back to ${GeminiConstants.MODEL_3_8_LIVE}")
-                                activeModel = GeminiConstants.MODEL_3_8_LIVE
+                            if (activeModel == GeminiConstants.MODEL_3_8_LIVE) {
+                                Log.w(TAG, "Model $activeModel rejected by Gemini ($reason). Auto-falling back to models/gemini-2.0-flash")
+                                activeModel = "models/gemini-2.0-flash"
+                                listener.onConnectionStateChanged("RECONNECTING...")
+                                scheduleReconnect()
+                                return
+                            } else if (activeModel != "models/gemini-2.0-flash-exp") {
+                                Log.w(TAG, "Model $activeModel rejected ($reason). Auto-falling back to models/gemini-2.0-flash-exp")
+                                activeModel = "models/gemini-2.0-flash-exp"
                                 listener.onConnectionStateChanged("RECONNECTING...")
                                 scheduleReconnect()
                                 return
@@ -250,7 +257,8 @@ class GeminiLiveWebSocket(
                     put("speechConfig", JSONObject().apply {
                         put("voiceConfig", JSONObject().apply {
                             put("prebuiltVoiceConfig", JSONObject().apply {
-                                put("voiceName", voiceName)
+                                val liveVoice = com.jarvis.assistant.audio.ZaraVoicePreferenceManager.getGeminiLiveVoiceName(voiceName)
+                                put("voiceName", liveVoice)
                             })
                         })
                     })

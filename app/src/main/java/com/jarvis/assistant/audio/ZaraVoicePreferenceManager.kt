@@ -191,6 +191,43 @@ object ZaraVoicePreferenceManager {
         }
     }
 
+    /**
+     * Maps the user-facing voice identifier to an official, verified Gemini Live
+     * prebuilt voice name accepted by Google's BidiGenerateContent WebSocket.
+     *
+     * Strict Gender Integrity:
+     * - Female voices ALWAYS map to a female prebuilt voice (Aoede, Kore, Leda, Zephyr).
+     * - Male voices ALWAYS map to a male prebuilt voice (Fenrir, Orus, Charon, Puck).
+     */
+    fun getGeminiLiveVoiceName(voiceId: String): String {
+        return when (voiceId.trim().lowercase()) {
+            "sulafat" -> "Aoede"
+            "achernar" -> "Kore"
+            "aoede" -> "Aoede"
+            "vindemiatrix" -> "Leda"
+            "zephyr" -> "Zephyr"
+
+            "algieba" -> "Fenrir"
+            "achird" -> "Orus"
+            "charon" -> "Charon"
+            "umbriel" -> "Charon"
+            "puck" -> "Puck"
+            "fenrir" -> "Fenrir"
+            "kore" -> "Kore"
+            "leda" -> "Leda"
+            "orus" -> "Orus"
+            else -> if (isFemaleVoice(voiceId)) "Aoede" else "Puck"
+        }
+    }
+
+    /**
+     * Resolves the verified Gemini Live WebSocket API voice identifier for the active session.
+     */
+    fun getLiveApiVoiceName(context: Context): String {
+        val userVoice = getGeminiVoiceName(context)
+        return getGeminiLiveVoiceName(userVoice)
+    }
+
     fun getSelectedVoiceProfile(context: Context): VoiceProfile {
         val name = getGeminiVoiceName(context)
         return getVoiceProfile(name) ?: FEMALE_PROFILES.first()

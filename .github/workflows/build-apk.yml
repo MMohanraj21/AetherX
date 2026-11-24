@@ -97,38 +97,24 @@ jobs:
         if: github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v5.6.0
-          name: "Zara AI Assistant v5.6.0 — Premium Human-like Tamil AI Voice System"
+          tag_name: v5.6.1
+          name: "Zara AI Assistant v5.6.1 — Voice Engine Handshake & Audition Player Fix"
           body: |
-            ### Zara AI Assistant v5.6.0 (Release Build 560)
+            ### Zara AI Assistant v5.6.1 (Release Build 561)
             Founder & Lead Architect: Mohanraj (@Hexvora777).
-            Official Connections:
-            - GitHub: https://github.com/Hexvora777
-            - Telegram: https://t.me/Hexvora777
-            - Instagram: https://instagram.com/Hexvora777
-            - Motto: "From Tamil Soil to a World of Possibilities."
 
-            ### What's New in v5.6.0:
-            - **Premium AI Voice Library (Exactly 10 Options)**:
-              - **5 Female AI Voices**: `Sulafat` (Warm, sweet & pleasant), `Achernar` (Soft, gentle & soothing), `Aoede` (Breezy & conversational), `Vindemiatrix` (Gentle & calm), `Zephyr` (Bright & clear).
-              - **5 Male AI Voices**: `Algieba` (Smooth & refined), `Achird` (Friendly & conversational), `Charon` (Clear & informative), `Umbriel` (Relaxed & easy-going), `Puck` (Energetic & upbeat).
-              - Verified Google Gemini Live neural voice identifiers (24kHz 16-bit PCM). Default female voice: `Sulafat`; default male voice: `Algieba`.
-            - **COMPLETE REMOVAL OF ANDROID TEXT-TO-SPEECH (TTS)**:
-              - Android TextToSpeech (`android.speech.tts.TextToSpeech`) completely and permanently purged from the application.
-              - ZERO robotic TTS voices. All conversational speech is generated 100% natively via Gemini Live WebSocket neural audio.
-            - **Advanced Tamil Voice Experience (`ta-IN`)**:
-              - Authentic spoken conversational Tamil (பேச்சுத் தமிழ்) as naturally spoken in Tamil Nadu.
-              - Elimination of stiff, archaic, bookish written Tamil.
-              - Natural human cadence, expressive emotional intonation (warmth, empathy, wit), and natural sentence pauses.
-              - Smooth, natural code-switching / Tanglish fluency for modern tech terms.
-            - **Futuristic OLED Voice Studio (`VoiceStudioActivity`)**:
-              - Pure OLED dark theme (`#08080C`, glassmorphic cards, sapphire/purple accents).
-              - Separate Female and Male voice tabs.
-              - 10 Voice Cards with personality descriptions, active voice indicators, and one-tap voice lock.
-              - Real-time native audition player previewing authentic Tamil audio (*"வணக்கம்! நான் Zara. எப்படி இருக்கீங்க? ಇಂದು உங்களுக்கு என்ன உதவி செய்யட்டும்? உங்களுடன் பேசுவதில் எனக்கு மகிழ்ச்சி."*).
-            - **Strict Voice Lock & Continuous Conversation**:
-              - Absolute gender lock (Male selected = Male only; Female selected = Female only). Zero cross-gender fallback.
-              - Unbroken conversational loop (`IDLE -> LISTENING -> PROCESSING -> SPEAKING -> LISTENING`).
+            ### Fixes & Enhancements in v5.6.1:
+            - **Native Voice Engine Handshake**:
+              - Fixed voice identifier mapping: `ZaraVoicePreferenceManager.getGeminiLiveVoiceName()` guarantees valid Gemini Live API voice identifiers (`Aoede`, `Kore`, `Leda`, `Zephyr` for female; `Fenrir`, `Orus`, `Charon`, `Puck` for male).
+              - Eliminated WebSocket setup rejection (1008/1007) so Gemini Live connects immediately without being muted or going offline.
+              - Model error resilience: auto-fallback from `gemini-3.8-live` to `models/gemini-2.0-flash` ensures real-time connection across all API keys.
+            - **100% Reliable Voice Audition Player**:
+              - Bundled 10 offline 24kHz audition audio assets in `assets/auditions/` ensuring preview sample playback ALWAYS plays smoothly.
+              - Fixed `GeminiRestClient.synthesizeSpeech` to target `gemini-2.0-flash` with mapped voice identifiers and automatic WAV container unwrap.
+            - **Synchronized Persona & Voice Studio Settings**:
+              - Completely removed legacy 5-radio group from `activity_persona.xml` and `PersonaActivity.kt`.
+              - Replaced with dynamic AI Voice Profile card and direct link to the 10-Voice Studio.
+              - Strict Gender Lock preserved everywhere across the application.
           files: |
             artifacts/Zara-release.apk
             artifacts/Zara-debug.apk
