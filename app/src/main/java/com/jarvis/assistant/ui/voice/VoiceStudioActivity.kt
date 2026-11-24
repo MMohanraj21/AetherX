@@ -169,7 +169,7 @@ class VoiceStudioActivity : AppCompatActivity() {
     }
 
     private suspend fun playVoiceAudition(profile: VoiceProfile) {
-        val apiKey = preferences.geminiApiKey
+        val apiKey = preferences.apiKey
         val cacheFile = File(cacheDir, "audition_${profile.id}.pcm")
 
         val audioBytes: ByteArray? = withContext(Dispatchers.IO) {
