@@ -2315,9 +2315,6 @@ class JarvisConversationService : Service() {
                         result.put("success", ok)
                         result.put("message", msg)
                     }
-                        result.put("success", ok)
-                        result.put("message", msg)
-                    }
 
                     "call_contact" -> {
                         val contact = args.optString("contact_name", "").trim()
