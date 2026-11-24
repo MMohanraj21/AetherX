@@ -97,24 +97,22 @@ jobs:
         if: github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v5.6.2
-          name: "Zara AI Assistant v5.6.2 — Zero Hallucination, WhatsApp Privacy Auto-Unlock & Tamil Auditions"
+          tag_name: v5.6.3
+          name: "Zara AI Assistant v5.6.3 — Genuine Gemini Neural Voice Auditions & Zero TextToSpeech"
           body: |
-            ### Zara AI Assistant v5.6.2 (Release Build 562)
+            ### Zara AI Assistant v5.6.3 (Release Build 563)
             Founder & Lead Architect: Mohanraj (@Hexvora777).
 
-            ### Fixes & Enhancements in v5.6.2:
-            - **Zero Hallucination / Zero Lying (Absolute Truthfulness)**:
-              - Completely eliminated premature `markExecuted()` bug in `MessageExecutionGate.kt` and `IntelligentConfirmationManager.kt`.
-              - Removed false success return from `send_whatsapp_message` idempotency filter; actions are only reported as completed when genuinely executed.
-              - Never argue or repeat false claims when challenged by the user: Zara immediately acknowledges and executes on screen.
-            - **WhatsApp Privacy PIN / Password Auto-Unlock**:
-              - Automated PIN & privacy password unlock via `JarvisAccessibilityService.kt` supporting password fields, Vivo OriginOS security keypad, and numeric digit button tapping.
-              - Added `set_whatsapp_pin` tool and `pin_password` parameter so user can provide or save their PIN.
-              - In-app WhatsApp search fallback: if contact is not in phone address book, Zara opens WhatsApp, searches in-app, selects contact, types message, and taps send.
-            - **Authentic Spoken Tamil Voice Auditions**:
-              - Replaced synthetic tone chirps with 10 authentic spoken Tamil speech MP3s in `app/src/main/assets/auditions/`.
-              - Upgraded `VoiceStudioActivity.kt` to play authentic spoken Tamil samples via `MediaPlayer`.
+            ### Fixes & Enhancements in v5.6.3:
+            - **Genuine Gemini Neural AI Voice Auditions in Voice Studio**:
+              - Exclusively powered by Google Gemini 2.0 Flash Audio API using the user's Gemini API key.
+              - Zero robotic TextToSpeech / Google Translate TTS audio: all 10 voices preview with authentic Gemini AI neural speech in conversational Tamil (ta-IN).
+              - Automatic 24kHz 16-bit Mono WAV container packaging (`wrapPcmInWav`) in `GeminiRestClient.kt` ensuring pristine hardware-accelerated playback via Android `MediaPlayer`.
+              - Persistent local disk caching (`gemini_audition_<voiceId>.wav`) for instantaneous subsequent auditions without network latency or duplicate API calls.
+              - Responsive Voice Studio UI: real-time "Loading..." state during voice generation and clear guidance if API key is unconfigured.
+            - **Zero False Completions (Truthfulness & Action Verification)**:
+              - Verified fix in `MessageExecutionGate.kt` and `IntelligentConfirmationManager.kt` preventing premature action completion reports.
+              - Full WhatsApp Privacy PIN auto-unlock and in-app search fallback working seamlessly on Vivo OriginOS 6 (Android 16).
           files: |
             artifacts/Zara-release.apk
             artifacts/Zara-debug.apk

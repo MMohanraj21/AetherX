@@ -42,6 +42,7 @@ class VoiceStudioActivity : AppCompatActivity() {
 
     private var currentGenderTab = VoiceGender.FEMALE
     private var currentlyPlayingVoiceId: String? = null
+    private var loadingVoiceId: String? = null
     private var activeMediaPlayer: MediaPlayer? = null
     private var activeAudioTrack: AudioTrack? = null
     private var auditionJob: Job? = null
@@ -160,14 +161,77 @@ class VoiceStudioActivity : AppCompatActivity() {
             return
         }
 
-        stopAuditionPlayback()
-        currentlyPlayingVoiceId = profile.id
-        voiceAdapter.notifyDataSetChanged()
+        if (loadingVoiceId == profile.id) {
+            // Already loading this voice -> cancel
+            stopAuditionPlayback()
+            return
+        }
 
-        // 1. First priority: Play authentic pre-recorded spoken Tamil MP3 audition asset
+        stopAuditionPlayback()
+
+        // 1. Check local persistent WAV cache
+        val cacheFile = File(cacheDir, "gemini_audition_${profile.id.lowercase()}.wav")
+        if (cacheFile.exists() && cacheFile.length() > 500) {
+            playWavFile(cacheFile, profile.id)
+            return
+        }
+
+        // 2. Synthesize genuine Gemini neural audio using user's Gemini API key
+        val apiKey = preferences.apiKey
+        if (apiKey.isBlank()) {
+            Toast.makeText(
+                this,
+                "Gemini API Key required to preview genuine AI voices. Please configure it in Settings.",
+                Toast.LENGTH_LONG
+            ).show()
+            return
+        }
+
+        loadingVoiceId = profile.id
+        voiceAdapter.notifyDataSetChanged()
+        Toast.makeText(
+            this,
+            "Generating Gemini AI voice audition for ${profile.displayName}...",
+            Toast.LENGTH_SHORT
+        ).show()
+
+        auditionJob = lifecycleScope.launch {
+            val result = GeminiRestClient.synthesizeSpeech(
+                apiKey = apiKey,
+                voiceName = profile.id,
+                text = profile.sampleTamilText
+            )
+
+            loadingVoiceId = null
+            if (result.isSuccess) {
+                val wavBytes = result.getOrNull()
+                if (wavBytes != null && wavBytes.isNotEmpty()) {
+                    try {
+                        cacheFile.writeBytes(wavBytes)
+                        playWavFile(cacheFile, profile.id)
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Failed to cache WAV audition: ${e.message}", e)
+                        voiceAdapter.notifyDataSetChanged()
+                    }
+                } else {
+                    voiceAdapter.notifyDataSetChanged()
+                    Toast.makeText(this@VoiceStudioActivity, "Voice generation returned empty audio.", Toast.LENGTH_SHORT).show()
+                }
+            } else {
+                voiceAdapter.notifyDataSetChanged()
+                val err = result.exceptionOrNull()?.message ?: "Unknown error"
+                Log.e(TAG, "Gemini voice generation failed: $err")
+                Toast.makeText(this@VoiceStudioActivity, "Could not generate voice: $err", Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
+    private fun playWavFile(file: File, voiceId: String) {
         try {
-            val assetPath = "auditions/audition_${profile.id.lowercase()}.mp3"
-            val afd = assets.openFd(assetPath)
+            stopAuditionPlayback()
+            currentlyPlayingVoiceId = voiceId
+            voiceAdapter.notifyDataSetChanged()
+
             val player = MediaPlayer().apply {
                 setAudioAttributes(
                     AudioAttributes.Builder()
@@ -175,13 +239,12 @@ class VoiceStudioActivity : AppCompatActivity() {
                         .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
                         .build()
                 )
-                setDataSource(afd.fileDescriptor, afd.startOffset, afd.length)
-                afd.close()
+                setDataSource(file.absolutePath)
                 setOnCompletionListener {
                     stopAuditionPlayback()
                 }
                 setOnErrorListener { _, what, extra ->
-                    Log.w(TAG, "MediaPlayer error: what=$what, extra=$extra")
+                    Log.w(TAG, "MediaPlayer error playing WAV: what=$what, extra=$extra")
                     stopAuditionPlayback()
                     true
                 }
@@ -189,122 +252,19 @@ class VoiceStudioActivity : AppCompatActivity() {
                 start()
             }
             activeMediaPlayer = player
-            return
         } catch (e: Exception) {
-            Log.w(TAG, "Bundled MP3 audition not found or failed for ${profile.id}: ${e.message}. Falling back to live synthesis.")
-        }
-
-        // 2. Fallback: Live synthesis via Gemini or PCM cache
-        auditionJob = lifecycleScope.launch {
-            playVoiceAuditionLiveFallback(profile)
-        }
-    }
-
-    private suspend fun playVoiceAuditionLiveFallback(profile: VoiceProfile) {
-        val apiKey = preferences.apiKey
-        val cacheFile = File(cacheDir, "audition_${profile.id.lowercase()}.pcm")
-
-        val audioBytes: ByteArray? = withContext(Dispatchers.IO) {
-            if (cacheFile.exists() && cacheFile.length() > 0) {
-                try { cacheFile.readBytes() } catch (e: Exception) { null }
-            } else if (apiKey.isNotBlank()) {
-                val result = GeminiRestClient.synthesizeSpeech(
-                    apiKey = apiKey,
-                    voiceName = profile.id,
-                    text = profile.sampleTamilText
-                )
-                if (result.isSuccess) {
-                    val bytes = result.getOrNull()
-                    if (bytes != null && bytes.isNotEmpty()) {
-                        try { cacheFile.writeBytes(bytes) } catch (_: Exception) {}
-                        bytes
-                    } else null
-                } else null
-            } else null
-        }
-
-        if (audioBytes == null || audioBytes.isEmpty()) {
-            Toast.makeText(
-                this@VoiceStudioActivity,
-                "Audition sample unavailable. Please try again.",
-                Toast.LENGTH_SHORT
-            ).show()
+            Log.e(TAG, "Failed to play WAV file for $voiceId: ${e.message}", e)
             stopAuditionPlayback()
-            return
-        }
-
-        playRawPcm(audioBytes, profile.id)
-    }
-
-    private suspend fun playRawPcm(rawBytes: ByteArray, voiceId: String) = withContext(Dispatchers.IO) {
-        try {
-            val pcmBytes = if (rawBytes.size > 44 &&
-                rawBytes[0] == 'R'.code.toByte() &&
-                rawBytes[1] == 'I'.code.toByte() &&
-                rawBytes[2] == 'F'.code.toByte() &&
-                rawBytes[3] == 'F'.code.toByte()
-            ) {
-                rawBytes.copyOfRange(44, rawBytes.size)
-            } else {
-                rawBytes
-            }
-
-            val minBufferSize = AudioTrack.getMinBufferSize(
-                SAMPLE_RATE,
-                AudioFormat.CHANNEL_OUT_MONO,
-                AudioFormat.ENCODING_PCM_16BIT
-            )
-            val bufferSize = maxOf(minBufferSize * 4, pcmBytes.size)
-
-            val attributes = AudioAttributes.Builder()
-                .setUsage(AudioAttributes.USAGE_MEDIA)
-                .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
-                .build()
-
-            val format = AudioFormat.Builder()
-                .setSampleRate(SAMPLE_RATE)
-                .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
-                .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
-                .build()
-
-            val track = AudioTrack.Builder()
-                .setAudioAttributes(attributes)
-                .setAudioFormat(format)
-                .setBufferSizeInBytes(bufferSize)
-                .setTransferMode(AudioTrack.MODE_STREAM)
-                .build()
-
-            activeAudioTrack = track
-            track.play()
-
-            val chunkSize = 4096
-            var offset = 0
-            while (offset < pcmBytes.size && currentlyPlayingVoiceId == voiceId) {
-                val bytesToWrite = minOf(chunkSize, pcmBytes.size - offset)
-                track.write(pcmBytes, offset, bytesToWrite)
-                offset += bytesToWrite
-            }
-
-            kotlinx.coroutines.delay(300)
-            track.stop()
-            track.release()
-        } catch (e: Exception) {
-            Log.e(TAG, "Error playing raw PCM: ${e.message}", e)
-        } finally {
-            activeAudioTrack = null
-            withContext(Dispatchers.Main) {
-                if (currentlyPlayingVoiceId == voiceId) {
-                    stopAuditionPlayback()
-                }
-            }
+            Toast.makeText(this, "Error playing voice audio", Toast.LENGTH_SHORT).show()
         }
     }
 
     private fun stopAuditionPlayback() {
         auditionJob?.cancel()
         auditionJob = null
-        val hadPlaying = currentlyPlayingVoiceId != null
+        val hadPlayingOrLoading = currentlyPlayingVoiceId != null || loadingVoiceId != null
         currentlyPlayingVoiceId = null
+        loadingVoiceId = null
         try {
             activeMediaPlayer?.stop()
             activeMediaPlayer?.release()
@@ -315,7 +275,7 @@ class VoiceStudioActivity : AppCompatActivity() {
             activeAudioTrack?.release()
         } catch (_: Exception) {}
         activeAudioTrack = null
-        if (hadPlaying) {
+        if (hadPlayingOrLoading) {
             voiceAdapter.notifyDataSetChanged()
         }
     }
@@ -354,6 +314,7 @@ class VoiceStudioActivity : AppCompatActivity() {
             fun bind(profile: VoiceProfile) {
                 val isSelected = profile.id.equals(preferences.voice, ignoreCase = true)
                 val isPlaying = currentlyPlayingVoiceId == profile.id
+                val isLoading = loadingVoiceId == profile.id
 
                 itemBinding.tvVoiceName.text = profile.displayName
                 itemBinding.tvVoiceGenderTag.text = if (profile.gender == VoiceGender.FEMALE) "Female" else "Male"
@@ -375,13 +336,23 @@ class VoiceStudioActivity : AppCompatActivity() {
                     itemBinding.btnSelect.alpha = 1.0f
                 }
 
-                // Play / Stop audition button
-                if (isPlaying) {
+                // Play / Loading / Stop audition button
+                if (isLoading) {
+                    itemBinding.btnAudition.text = "Loading..."
+                    itemBinding.btnAudition.isEnabled = false
+                    itemBinding.btnAudition.alpha = 0.6f
+                    itemBinding.btnAudition.setIconResource(R.drawable.ic_sound_play)
+                    itemBinding.btnAudition.setIconTintResource(R.color.studio_purple_bright)
+                } else if (isPlaying) {
                     itemBinding.btnAudition.text = "Stop Audition"
+                    itemBinding.btnAudition.isEnabled = true
+                    itemBinding.btnAudition.alpha = 1.0f
                     itemBinding.btnAudition.setIconResource(R.drawable.ic_sound_stop)
                     itemBinding.btnAudition.setIconTintResource(R.color.studio_purple_bright)
                 } else {
                     itemBinding.btnAudition.text = "Play Audition"
+                    itemBinding.btnAudition.isEnabled = true
+                    itemBinding.btnAudition.alpha = 1.0f
                     itemBinding.btnAudition.setIconResource(R.drawable.ic_sound_play)
                     itemBinding.btnAudition.setIconTintResource(R.color.studio_text_primary)
                 }
